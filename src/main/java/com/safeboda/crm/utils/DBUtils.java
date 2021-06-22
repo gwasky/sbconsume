@@ -41,7 +41,8 @@ public class DBUtils {
 
 
     public ArrayList<AgentAvailability> getScheduledAgentsAndAvailability(String availabilityDate) throws SQLException {
-        Properties properties = getDBCredential();
+        Utils utils = new Utils();
+        Properties properties = utils.loadProperties();
         ArrayList<AgentAvailability> agents = new ArrayList<>();
         MysqlDataSource dataSource = new MysqlDataSource();
         dataSource.setUser(properties.getProperty("db.user"));
@@ -65,9 +66,8 @@ public class DBUtils {
                 String dateEntered = resultSet.getString("date_entered");
                 String availabile = resultSet.getString("available");
                 AgentAvailability agentAvailability = new AgentAvailability(scheduleFromDate,scheduleToDate,agentName,agentID,availabitityDate,dateEntered,availabile);
-                logger.info(String.valueOf(agentAvailability));
+                // logger.info(String.valueOf(agentAvailability));
                 agents.add(agentAvailability);
-                System.out.println(availabile);
             }
         }catch (Exception e){
             logger.error(e.getMessage());
@@ -89,22 +89,7 @@ public class DBUtils {
         return agents;
     }
 
-    public Properties getDBCredential(){
-        // Load Properties file from classpath
-        Properties properties = new Properties();
-        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(configFileName)){
-            if(inputStream == null){
-                logger.info("Unable to find configuration file " + configFileName);
-                return properties;
-            }
-            properties.load(inputStream);
-        }
-        catch (IOException ex)
-        {
-            ex.printStackTrace();
-        }
-        return properties;
-    }
+
 
 
 

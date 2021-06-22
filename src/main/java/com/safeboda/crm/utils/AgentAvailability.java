@@ -11,6 +11,7 @@ public class AgentAvailability {
     private String availabitityDate;
     private String dateEntered;
     private String availabile;
+    private int count;
 
 
     public AgentAvailability(String scheduleFromDate, String scheduleToDate, String agentName,String agentID, String availabitityDate, String dateEntered, String availabile) {

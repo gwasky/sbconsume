@@ -10,8 +10,10 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Properties;
 
@@ -40,7 +42,7 @@ public class CasesConsumer {
         //  poll for new data
         while (true){
             ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
-
+            String timeStamp = new SimpleDateFormat("yyyy-MM-dd").format(Calendar.getInstance().getTime());
             for (ConsumerRecord<String,String> record : records){
                 logger.info("Key" + record.key() + ", Value " + record.value());
                 logger.info("Partition: "+ record.partition() + ", Offest "+ record.offset());
