@@ -34,26 +34,40 @@ public class DBUtils {
             "left outer join bo_bo_agent_availability agent_availability on agent_availability_j.bo_bo_schee90fability_idb = agent_availability.id\n" +
             "where agent_availability.name = ? ";
 
-    public DBUtils(String availabilityDate) {
+    private String assignCaseQuery = "update cases set assigned_user_id = ? where id = ?";
 
+    public DBUtils(String availabilityDate) {
         this.availabilityDate = availabilityDate;
+    }
+
+    public Connection getDBConnection(){
+        Utils utils = new Utils();
+        Connection conn = null;
+        try {
+            Properties properties = utils.loadProperties();
+            MysqlDataSource dataSource = new MysqlDataSource();
+            dataSource.setUser(properties.getProperty("db.user"));
+            dataSource.setPassword(properties.getProperty("db.password"));
+            dataSource.setServerName(properties.getProperty("db.server"));
+            dataSource.setPortNumber(Integer.parseInt(properties.getProperty("db.port")));
+            dataSource.setDatabaseName(properties.getProperty("db.name"));
+            conn = dataSource.getConnection();
+        } catch (Exception ex){
+            logger.error(ex.getMessage());
+        }finally {
+
+        }
+        return conn;
     }
 
 
     public ArrayList<AgentAvailability> getScheduledAgentsAndAvailability(String availabilityDate) throws SQLException {
-        Utils utils = new Utils();
-        Properties properties = utils.loadProperties();
         ArrayList<AgentAvailability> agents = new ArrayList<>();
-        MysqlDataSource dataSource = new MysqlDataSource();
-        dataSource.setUser(properties.getProperty("db.user"));
-        dataSource.setPassword(properties.getProperty("db.password"));
-        dataSource.setServerName(properties.getProperty("db.server"));
-        dataSource.setPortNumber(Integer.parseInt(properties.getProperty("db.port")));
-        dataSource.setDatabaseName(properties.getProperty("db.name"));
-        Connection conn = dataSource.getConnection();
+        Connection conn = null;
         PreparedStatement preparedStatement = null;
         ResultSet resultSet = null;
         try{
+            conn = getDBConnection();
             preparedStatement = conn.prepareStatement(query);
             preparedStatement.setString(1,availabilityDate);
             resultSet = preparedStatement.executeQuery();
@@ -88,6 +102,21 @@ public class DBUtils {
         }
         return agents;
     }
+
+    public boolean assignCaseToAgent(String caseId,String userId){
+        Connection conn = null;
+        try {
+            conn = getDBConnection();
+            PreparedStatement preparedStatement = conn.prepareStatement(assignCaseQuery);
+            preparedStatement.setString(1,userId);
+            preparedStatement.setString(2,caseId);
+            return preparedStatement.execute();
+        }catch (Exception ex){
+            logger.error(ex.getMessage());
+        }
+        return false;
+    }
+
 
 
 

@@ -108,7 +108,6 @@ public class Utils {
         for (JsonElement jsonElement : arr){
             agentsList.add(gson.fromJson(jsonElement,AgentAssignmentTracker.class));
         }
-        System.out.println(agentsList.getClass());
         List<AgentAssignmentTracker> availableAgents = agentsList.stream()
               .filter(p -> p.getAgentAvailability().endsWith("no")).collect(Collectors.toList());
         if (availableAgents.size() > 0) {
@@ -121,5 +120,24 @@ public class Utils {
             logger.info("There are no available agents");
         }
         return userId;
+    }
+
+    public String updateAssignmentAccounts(String availabilityDate,String agents,String userId) {
+        JsonArray arr = new JsonParser().parse(agents).getAsJsonArray();
+        ArrayList<AgentAssignmentTracker> agentsList = new ArrayList<>();
+        Gson gson = new Gson();
+        for (JsonElement jsonElement : arr){
+            agentsList.add(gson.fromJson(jsonElement,AgentAssignmentTracker.class));
+        }
+        agentsList.stream().forEach(p -> {
+            if (p.getAgentId().equals(userId)) {
+                // System.out.println(p.getAgentId());
+                p.setCount(p.getCount() + 1);
+            }
+        });
+        Jedis redisClient = redisClient();
+        String json = gson.toJson(agentsList);
+        redisClient.set(availabilityDate,json);
+        return json;
     }
 }

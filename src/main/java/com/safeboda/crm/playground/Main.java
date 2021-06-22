@@ -29,7 +29,7 @@ public class Main {
             String availabilityDate = "2021-06-29";
             ArrayList<AgentAvailability> scheduledAgentsAvailability = dbUtils.getScheduledAgentsAndAvailability(availabilityDate);
             boolean exists = utils.checkForObjectRedisPersistence(availabilityDate);
-            logger.info(String.valueOf(exists));
+            // logger.info(String.valueOf(exists));
             if (!exists){
                 agentAssignmentTracker = utils.initializeObjectInRedis(availabilityDate,scheduledAgentsAvailability);
             } else {
@@ -37,9 +37,17 @@ public class Main {
                 agentAssignmentTracker = utils.getAvailabilityObjectFromRedis(availabilityDate);
                 // Deserialize
                 String userId = utils.nominateUserForAssignment(agentAssignmentTracker);
-                System.out.println(userId);
+                // System.out.println(userId);
+                // boolean assignmentStatus = dbUtils.assignCaseToAgent("",userId);
+                if (true) {
+                    // Update Assignment Counts for the day
+                    utils.updateAssignmentAccounts(availabilityDate,agentAssignmentTracker,userId);
+                    logger.info("Successful");
+                } else {
+                    logger.info("Failed");
+                }
+                // System.out.println(userId);
             }
-
         } catch (SQLException ex){
             logger.error(ex.getMessage());
         }
