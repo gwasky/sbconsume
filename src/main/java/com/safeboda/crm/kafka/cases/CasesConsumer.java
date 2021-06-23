@@ -56,6 +56,7 @@ public class CasesConsumer {
             String availabilityDate = new SimpleDateFormat("yyyy-MM-dd").format(Calendar.getInstance().getTime());
 
             for (ConsumerRecord<String, String> record : records) {
+
                 logger.info("Key" + record.key() + ", Value " + record.value());
                 // logger.info("Partition: " + record.partition() + ", Offest " + record.offset());
 
@@ -78,15 +79,16 @@ public class CasesConsumer {
                             logger.error("Error Fetching Availability Object from Redis - {}", ex.getMessage());
                         }
                     }
-                    logger.info(agentAssignmentTracker);
-                    if (agentAssignmentTracker != null) {
-                        String userId = utils.nominateUserForAssignment(agentAssignmentTracker);
+                    // logger.info(agentAssignmentTracker);
+                    String agentAvailabilityList = utils.updateAvailabilityTrackerWithNewlyAvailableAgents(availabilityDate,scheduledAgentsAvailability,agentAssignmentTracker);
+                    if (agentAvailabilityList != null) {
+                        String userId = utils.nominateUserForAssignment(agentAvailabilityList);
                         // System.out.println(userId);
                         boolean assignmentStatus = dbUtils.assignCaseToAgent(record.value(), userId);
                         logger.info("CaseID[{}] | UserID[{}] | result[{}]", record.value(), userId, assignmentStatus);
                         if (assignmentStatus) {
                             // Update Assignment Counts for the day
-                            String updatedAgentTracker = utils.updateAssignmentCounts(availabilityDate, agentAssignmentTracker, userId);
+                            String updatedAgentTracker = utils.updateAssignmentCounts(availabilityDate, agentAvailabilityList, userId);
                             logger.info("Successful | refreshed Counts | {}", updatedAgentTracker);
                         } else {
                             logger.info("CaseID[{}] Assignment to Agent[{}] Failed", record.value(), userId);

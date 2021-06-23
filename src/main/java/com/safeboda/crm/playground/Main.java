@@ -26,14 +26,13 @@ public class Main {
         DBUtils dbUtils = new DBUtils("");
         Utils utils = new Utils();
         try {
-            // AgentAssignmentTracker agentAssignmentTracker = null;
             String agentAssignmentTracker = null;
             // String timeStamp = new SimpleDateFormat("yyyy-MM-dd").format(Calendar.getInstance().getTime());
             // System.out.println(timeStamp);
             // System.exit(0);
             String availabilityDate = "2021-06-23";
             ArrayList<AgentAvailability> scheduledAgentsAvailability = dbUtils.getScheduledAgentsAndAvailability(availabilityDate);
-            logger.info(String.valueOf(scheduledAgentsAvailability));
+            // logger.info(String.valueOf(scheduledAgentsAvailability));
             // System.exit(0);
             boolean exists = utils.checkForObjectRedisPersistence(availabilityDate);
             // logger.info(String.valueOf(exists));
