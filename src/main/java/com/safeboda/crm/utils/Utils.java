@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 
 public class Utils {
 
-    Logger logger = LoggerFactory.getLogger(DBUtils.class.getName());
+    Logger logger = LoggerFactory.getLogger(Utils.class.getName());
     private String configFileName = "config.properties";
 
     public Utils() {
@@ -73,11 +73,8 @@ public class Utils {
 
     public String initializeObjectInRedis(String availabilityDate,ArrayList<AgentAvailability> agents){
         ArrayList<AgentAssignmentTracker> agentTrackerList = new ArrayList<>();
-        AgentAssignmentTracker agentAssignmentTracker = new AgentAssignmentTracker();
         for (AgentAvailability agent : agents){
-            agentAssignmentTracker.setAgentId(agent.getAgentID());
-            agentAssignmentTracker.setAgentAvailability(agent.getAvailabile());
-            agentAssignmentTracker.setCount(0);
+            AgentAssignmentTracker agentAssignmentTracker = new AgentAssignmentTracker(agent.getAgentID(),agent.getAvailabile(),0);
             agentTrackerList.add(agentAssignmentTracker);
             //System.out.println(agent.getAgentID());
         }
@@ -104,10 +101,12 @@ public class Utils {
         String userId = null;
         Gson gson = new Gson();
         ArrayList<AgentAssignmentTracker> agentsList = new ArrayList<>();
+        // Deserialize
         JsonArray arr = new JsonParser().parse(agents).getAsJsonArray();
         for (JsonElement jsonElement : arr){
             agentsList.add(gson.fromJson(jsonElement,AgentAssignmentTracker.class));
         }
+        logger.info(String.valueOf(agentsList));
         List<AgentAssignmentTracker> availableAgents = agentsList.stream()
               .filter(p -> p.getAgentAvailability().endsWith("no")).collect(Collectors.toList());
         if (availableAgents.size() > 0) {
@@ -122,7 +121,7 @@ public class Utils {
         return userId;
     }
 
-    public String updateAssignmentAccounts(String availabilityDate,String agents,String userId) {
+    public String updateAssignmentCounts(String availabilityDate,String agents,String userId) {
         JsonArray arr = new JsonParser().parse(agents).getAsJsonArray();
         ArrayList<AgentAssignmentTracker> agentsList = new ArrayList<>();
         Gson gson = new Gson();
@@ -131,7 +130,6 @@ public class Utils {
         }
         agentsList.stream().forEach(p -> {
             if (p.getAgentId().equals(userId)) {
-                // System.out.println(p.getAgentId());
                 p.setCount(p.getCount() + 1);
             }
         });

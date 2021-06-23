@@ -36,8 +36,11 @@ public class DBUtils {
 
     private String assignCaseQuery = "update cases set assigned_user_id = ? where id = ?";
 
+    public DBUtils() {
+    }
+
     public DBUtils(String availabilityDate) {
-        this.availabilityDate = availabilityDate;
+        // this.availabilityDate = availabilityDate;
     }
 
     public Connection getDBConnection(){
@@ -105,16 +108,21 @@ public class DBUtils {
 
     public boolean assignCaseToAgent(String caseId,String userId){
         Connection conn = null;
+        boolean status = false;
         try {
             conn = getDBConnection();
             PreparedStatement preparedStatement = conn.prepareStatement(assignCaseQuery);
             preparedStatement.setString(1,userId);
             preparedStatement.setString(2,caseId);
-            return preparedStatement.execute();
+            int x = preparedStatement.executeUpdate();
+            System.out.println(x);
+            if (x == 1) status=true;
+        }catch (SQLException ex){
+            logger.error(ex.getMessage());
         }catch (Exception ex){
             logger.error(ex.getMessage());
         }
-        return false;
+        return status;
     }
 
 
