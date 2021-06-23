@@ -27,7 +27,14 @@ public class CasesConsumer {
         Utils utils = new Utils();
         DBUtils dbUtils = new DBUtils();
         Properties props = utils.loadProperties();
-        String bootstrapServers = props.getProperty("kafka.bootstrap.server");
+        String bootstrapServers = null;
+        if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("production")){
+            bootstrapServers = System.getenv("BROKER");
+        } else{
+            bootstrapServers = props.getProperty("kafka.bootstrap.server");
+        }
+
+        logger.info("BROKER - {}", bootstrapServers);
         String groupId = "backoffice-assignment-application";
         String topic = props.getProperty("kafka.backoffice.topic");
 
@@ -59,24 +66,32 @@ public class CasesConsumer {
                     boolean exists = utils.checkForObjectRedisPersistence(availabilityDate);
                     logger.info(String.valueOf(exists));
                     if (!exists) {
-                        agentAssignmentTracker = utils.initializeObjectInRedis(availabilityDate, scheduledAgentsAvailability);
+                        try {
+                            agentAssignmentTracker = utils.initializeObjectInRedis(availabilityDate, scheduledAgentsAvailability);
+                        } catch (Exception ex) {
+                            logger.error("Error Initializing Object in Redis - {}", ex.getMessage());
+                        }
                     } else {
-                        agentAssignmentTracker = utils.getAvailabilityObjectFromRedis(availabilityDate);
+                        try {
+                            agentAssignmentTracker = utils.getAvailabilityObjectFromRedis(availabilityDate);
+                        } catch (Exception ex) {
+                            logger.error("Error Fetching Availability Object from Redis - {}", ex.getMessage());
+                        }
                     }
                     logger.info(agentAssignmentTracker);
-                    if ( agentAssignmentTracker != null) {
+                    if (agentAssignmentTracker != null) {
                         String userId = utils.nominateUserForAssignment(agentAssignmentTracker);
                         // System.out.println(userId);
-                        boolean assignmentStatus = dbUtils.assignCaseToAgent(record.value(),userId);
-                        logger.info("CaseID[{}] | UserID[{}] | result[{}]", record.value(),userId,assignmentStatus);
+                        boolean assignmentStatus = dbUtils.assignCaseToAgent(record.value(), userId);
+                        logger.info("CaseID[{}] | UserID[{}] | result[{}]", record.value(), userId, assignmentStatus);
                         if (assignmentStatus) {
                             // Update Assignment Counts for the day
                             String updatedAgentTracker = utils.updateAssignmentCounts(availabilityDate, agentAssignmentTracker, userId);
                             logger.info("Successful | refreshed Counts | {}", updatedAgentTracker);
                         } else {
-                            logger.info("Failed");
+                            logger.info("CaseID[{}] Assignment to Agent[{}] Failed", record.value(), userId);
                         }
-                    }else{
+                    } else {
                         logger.error("No Object found for Agent Assignment Tracker");
                     }
                     // System.out.println(userId);
@@ -84,7 +99,6 @@ public class CasesConsumer {
                 } catch (SQLException ex) {
 
                 }
-
             }
         }
 

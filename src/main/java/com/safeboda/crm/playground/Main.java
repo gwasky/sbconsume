@@ -31,9 +31,10 @@ public class Main {
             // String timeStamp = new SimpleDateFormat("yyyy-MM-dd").format(Calendar.getInstance().getTime());
             // System.out.println(timeStamp);
             // System.exit(0);
-            String availabilityDate = "2021-06-22";
+            String availabilityDate = "2021-06-23";
             ArrayList<AgentAvailability> scheduledAgentsAvailability = dbUtils.getScheduledAgentsAndAvailability(availabilityDate);
             logger.info(String.valueOf(scheduledAgentsAvailability));
+            // System.exit(0);
             boolean exists = utils.checkForObjectRedisPersistence(availabilityDate);
             // logger.info(String.valueOf(exists));
             if (!exists) {
@@ -41,16 +42,20 @@ public class Main {
             } else {
                 // Update
                 agentAssignmentTracker = utils.getAvailabilityObjectFromRedis(availabilityDate);
-            }
 
-            if (agentAssignmentTracker != null) {
+
+            }
+            String agentAvailabilityList = utils.updateAvailabilityTrackerWithNewlyAvailableAgents(availabilityDate,scheduledAgentsAvailability,agentAssignmentTracker);
+            logger.info(agentAvailabilityList);
+            // System.exit(0);
+            if (agentAvailabilityList != null) {
                 // Deserialize
-                String userId = utils.nominateUserForAssignment(agentAssignmentTracker);
+                String userId = utils.nominateUserForAssignment(agentAvailabilityList);
                 // System.out.println(userId);
                 // boolean assignmentStatus = dbUtils.assignCaseToAgent("",userId);
                 if (true) {
                     // Update Assignment Counts for the day
-                    utils.updateAssignmentCounts(availabilityDate, agentAssignmentTracker, userId);
+                    utils.updateAssignmentCounts(availabilityDate, agentAvailabilityList, userId);
                     logger.info("Successful");
                 } else {
                     logger.info("Failed");

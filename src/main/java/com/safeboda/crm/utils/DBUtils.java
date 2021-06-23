@@ -32,7 +32,10 @@ public class DBUtils {
             "left outer join bo_bo_scheduled_agents scheduled_agents on scheduled_agents.id = scheduled_agents_j.bo_bo_scheduler_bo_bo_scheduled_agentsbo_bo_scheduled_agents_idb \n" +
             "left outer join bo_bo_scheduled_agents_bo_bo_agent_availability_c agent_availability_j on agent_availability_j.bo_bo_scheadd3_agents_ida = scheduled_agents.id\n" +
             "left outer join bo_bo_agent_availability agent_availability on agent_availability_j.bo_bo_schee90fability_idb = agent_availability.id\n" +
-            "where agent_availability.name = ? ";
+            "left outer join bo_bo_schedule_slots slots on slots.id = scheduled_agents.bo_bo_schedule_slots_id_c\n" +
+            "where agent_availability.name = ? and agent_availability.available = 'yes'\n" +
+            "\tand convert(replace(substring(time(date_sub(UTC_TIMESTAMP(), interval -3 hour)),1,5),':',''),unsigned integer) >= convert(substring_index(slots.name,'|',1),unsigned integer)\n" +
+            "\tand convert(replace(substring(time(date_sub(UTC_TIMESTAMP(), interval -3 hour)),1,5),':',''),unsigned integer) < convert(substring_index(slots.name,'|',-1),unsigned integer)";
 
     private String assignCaseQuery = "update cases set assigned_user_id = ? where id = ?";
 
