@@ -61,9 +61,7 @@ public class DBUtils {
             dataSource.setDatabaseName(properties.getProperty("db.name"));
             conn = dataSource.getConnection();
         } catch (Exception ex){
-            logger.error(ex.getMessage());
-        }finally {
-
+            ex.printStackTrace();
         }
         return conn;
     }

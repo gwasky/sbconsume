@@ -29,7 +29,7 @@ public class Utils {
 
     public Properties loadProperties() {
 
-        if (System.getenv("OP_ENV") == "production") {
+        if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("production")) {
             configFileName = "config.properties";
         }
         // Load Properties file from classpath
@@ -49,16 +49,20 @@ public class Utils {
     public Jedis redisClient() {
         Properties properties = loadProperties();
         try {
+            logger.info("Connecting to Redis {} - {}", properties.getProperty("redis.server"), Integer.parseInt(properties.getProperty("redis.port")));
             Jedis jedis = new Jedis(properties.getProperty("redis.server"), Integer.parseInt(properties.getProperty("redis.port")));
             // System.out.println(properties.getProperty("redis.password"));
             if (jedis != null) {
                 jedis.auth(properties.getProperty("redis.password"));
             }
+            logger.info("Connection to Redis Successful");
             return jedis;
         } catch (JedisConnectionException ex) {
-            logger.error(ex.getMessage());
+            // logger.error(ex.getMessage());
+            ex.printStackTrace();
         } catch (Exception ex) {
-            logger.error(ex.getMessage());
+            ex.printStackTrace();
+            // logger.error(ex.getMessage());
         }
         return null;
     }
@@ -195,8 +199,10 @@ public class Utils {
 
         Jedis redisClient = redisClient();
         String json = gson.toJson(agentsList);
-        redisClient.set(availabilityDate, json);
 
+        if (json != null) {
+            redisClient.set(availabilityDate, json);
+        }
         return json;
     }
 }

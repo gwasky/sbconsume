@@ -27,7 +27,7 @@ public class Main {
             // String timeStamp = new SimpleDateFormat("yyyy-MM-dd").format(Calendar.getInstance().getTime());
             // System.out.println(timeStamp);
             // System.exit(0);
-            String availabilityDate = "2021-06-23";
+            String availabilityDate = "2021-06-24";
             ArrayList<AgentAvailability> scheduledAgentsAvailability = dbUtils.getScheduledAgentsAndAvailability(availabilityDate);
             // logger.info(String.valueOf(scheduledAgentsAvailability));
             // System.exit(0);
