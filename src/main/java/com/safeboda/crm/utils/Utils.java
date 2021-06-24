@@ -149,9 +149,9 @@ public class Utils {
     public String updateAvailabilityTrackerWithNewlyAvailableAgents(String availabilityDate, ArrayList<AgentAvailability> scheduledAgentsAvailability, String agents) {
 
         ArrayList<AgentAssignmentTracker> agentsList = new ArrayList<>();
+        Gson gson = new Gson();
         if (agents != null) {
             JsonArray arr = new JsonParser().parse(agents).getAsJsonArray();
-            Gson gson = new Gson();
             for (JsonElement jsonElement : arr) {
                 agentsList.add(gson.fromJson(jsonElement, AgentAssignmentTracker.class));
             }
