@@ -1,5 +1,10 @@
 package com.safeboda.crm.utils;
 
+/**
+ * @author Gibson Wasukira
+ * @created 23/06/2021 - 6:59 PM
+ */
+
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -142,13 +147,15 @@ public class Utils {
     }
 
     public String updateAvailabilityTrackerWithNewlyAvailableAgents(String availabilityDate, ArrayList<AgentAvailability> scheduledAgentsAvailability, String agents) {
-        JsonArray arr = new JsonParser().parse(agents).getAsJsonArray();
-        ArrayList<AgentAssignmentTracker> agentsList = new ArrayList<>();
-        Gson gson = new Gson();
-        for (JsonElement jsonElement : arr) {
-            agentsList.add(gson.fromJson(jsonElement, AgentAssignmentTracker.class));
-        }
 
+        ArrayList<AgentAssignmentTracker> agentsList = new ArrayList<>();
+        if (agents != null) {
+            JsonArray arr = new JsonParser().parse(agents).getAsJsonArray();
+            Gson gson = new Gson();
+            for (JsonElement jsonElement : arr) {
+                agentsList.add(gson.fromJson(jsonElement, AgentAssignmentTracker.class));
+            }
+        }
         // Generate list of newly available agents
         List<String> availableAgents = scheduledAgentsAvailability.stream()
                 .map(AgentAvailability::getAgentID)

@@ -1,5 +1,9 @@
 package com.safeboda.crm.kafka.cases;
 
+/**
+ * @author Gibson Wasukira
+ * @created 23/06/2021 - 6:59 PM
+ */
 
 import com.safeboda.crm.utils.AgentAvailability;
 import com.safeboda.crm.utils.DBUtils;

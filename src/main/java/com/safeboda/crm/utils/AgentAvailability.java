@@ -1,6 +1,9 @@
 package com.safeboda.crm.utils;
 
-import java.util.Date;
+/**
+ * @author Gibson Wasukira
+ * @created 23/06/2021 - 6:59 PM
+ */
 
 public class AgentAvailability {
 

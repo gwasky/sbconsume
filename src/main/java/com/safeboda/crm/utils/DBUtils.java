@@ -1,12 +1,14 @@
 package com.safeboda.crm.utils;
 
+/**
+ * @author Gibson Wasukira
+ * @created 23/06/2021 - 6:59 PM
+ */
+
 import com.mysql.cj.jdbc.MysqlDataSource;
-import com.safeboda.crm.kafka.cases.CasesConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

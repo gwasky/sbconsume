@@ -1,5 +1,10 @@
 package com.safeboda.crm.utils;
 
+/**
+ * @author Gibson Wasukira
+ * @created 23/06/2021 - 6:59 PM
+ */
+
 public class AgentAssignmentTracker {
 
     private String agentId;

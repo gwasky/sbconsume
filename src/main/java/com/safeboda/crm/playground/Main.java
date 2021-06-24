@@ -1,10 +1,10 @@
 package com.safeboda.crm.playground;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
-import com.safeboda.crm.utils.AgentAssignmentTracker;
+/**
+ * @author Gibson Wasukira
+ * @created 23/06/2021 - 6:59 PM
+ */
+
 import com.safeboda.crm.utils.AgentAvailability;
 import com.safeboda.crm.utils.DBUtils;
 import com.safeboda.crm.utils.Utils;
@@ -12,10 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Properties;
 
 public class Main {
 
