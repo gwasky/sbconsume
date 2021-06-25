@@ -9,13 +9,26 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -49,13 +62,13 @@ public class Utils {
     public Jedis redisClient() {
         Properties properties = loadProperties();
         try {
-            logger.info("Connecting to Redis {} - {}", properties.getProperty("redis.server"), Integer.parseInt(properties.getProperty("redis.port")));
+            // logger.info("Connecting to Redis {} - {}", properties.getProperty("redis.server"), Integer.parseInt(properties.getProperty("redis.port")));
             Jedis jedis = new Jedis(properties.getProperty("redis.server"), Integer.parseInt(properties.getProperty("redis.port")));
             // System.out.println(properties.getProperty("redis.password"));
             if (jedis != null) {
                 jedis.auth(properties.getProperty("redis.password"));
             }
-            logger.info("Connection to Redis Successful");
+            // logger.info("Connection to Redis Successful");
             return jedis;
         } catch (JedisConnectionException ex) {
             // logger.error(ex.getMessage());
@@ -204,5 +217,54 @@ public class Utils {
             redisClient.set(availabilityDate, json);
         }
         return json;
+    }
+
+    public void sendSMS1(String message,List<String> phoneNumbers) {
+
+        for(String phoneNumber: phoneNumbers) {
+            System.out.println(phoneNumber);
+            String urlParameters = "user=Ricky2015&password=123456&sender=New-world&message=" +message+"&receiver="+phoneNumber;
+            byte[] postData = urlParameters.getBytes(StandardCharsets.UTF_8);
+            int postDataLength = postData.length;
+            String request = "http://caresmsgroup.com/api.php";
+            try {
+                URL url = new URL(request);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setDoOutput(true);
+                conn.setInstanceFollowRedirects(false);
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+                conn.setRequestProperty("charset", "utf-8");
+                conn.setRequestProperty("Content-Length", Integer.toString(postDataLength));
+                conn.setUseCaches(false);
+                try (DataOutputStream wr = new DataOutputStream(conn.getOutputStream())) {
+                    wr.write(postData);
+                }
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
+
+    public void sendSMS(String message,List<String> phoneNumbers) throws Exception {
+
+        HttpPost post = new HttpPost("http://caresmsgroup.com/api.php");
+
+        for(String phoneNumber: phoneNumbers) {
+            // add request parameter, form parameters
+            List<NameValuePair> urlParameters = new ArrayList<>();
+            urlParameters.add(new BasicNameValuePair("user", "Ricky2015"));
+            urlParameters.add(new BasicNameValuePair("password", "123456"));
+            urlParameters.add(new BasicNameValuePair("sender", "New-world"));
+            urlParameters.add(new BasicNameValuePair("message", message));
+            urlParameters.add(new BasicNameValuePair("reciever", phoneNumber));
+            post.setEntity(new UrlEncodedFormEntity(urlParameters));
+
+            try (CloseableHttpClient httpClient = HttpClients.createDefault();
+                 CloseableHttpResponse response = httpClient.execute(post)) {
+                System.out.println(EntityUtils.toString(response.getEntity()));
+            }
+        }
+
     }
 }

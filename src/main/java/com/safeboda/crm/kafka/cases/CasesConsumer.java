@@ -58,7 +58,7 @@ public class CasesConsumer {
         while (true) {
             ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
             String availabilityDate = new SimpleDateFormat("yyyy-MM-dd").format(Calendar.getInstance().getTime());
-
+            String availabilityDateTime = new SimpleDateFormat("yyyy-MM-dd HH:mm").format(Calendar.getInstance().getTime());
             for (ConsumerRecord<String, String> record : records) {
 
                 logger.info("Key: " + record.key() + ",  Value: " + record.value());
@@ -67,29 +67,31 @@ public class CasesConsumer {
                 String agentAssignmentTracker = null;
                 try {
                     ArrayList<AgentAvailability> scheduledAgentsAvailability = dbUtils.getScheduledAgentsAndAvailability(availabilityDate);
-                    logger.info("scheduledAgentsAvailability - {}", scheduledAgentsAvailability);
-                    if (scheduledAgentsAvailability != null) {
-
+                    logger.info("{} - Number of Scheduled Agents - {}", record.value(),scheduledAgentsAvailability.size());
+                    if (scheduledAgentsAvailability.size() > 0) {
                         // logger.info(String.valueOf(scheduledAgentsAvailability));
                         boolean exists = utils.checkForObjectRedisPersistence(availabilityDate);
-                        logger.info(String.valueOf(exists));
+                        // logger.info(String.valueOf(exists));
                         if (!exists) {
                             try {
                                 agentAssignmentTracker = utils.initializeObjectInRedis(availabilityDate, scheduledAgentsAvailability);
                             } catch (Exception ex) {
-                                logger.error("Error Initializing Object in Redis - {}", ex.getMessage());
+                                logger.error("{} - Error Initializing Object in Redis - {}", record.value(),ex.getMessage());
+                                ex.printStackTrace();
                             }
                         } else {
                             try {
                                 agentAssignmentTracker = utils.getAvailabilityObjectFromRedis(availabilityDate);
                             } catch (Exception ex) {
-                                logger.error("Error Fetching Availability Object from Redis - {}", ex.getMessage());
+                                logger.error("{} - Error Fetching Availability Object from Redis - {}", record.value(),ex.getMessage());
+                                ex.printStackTrace();
                             }
                         }
                         // logger.info(agentAssignmentTracker);
                         String agentAvailabilityList = utils.updateAvailabilityTrackerWithNewlyAvailableAgents(availabilityDate, scheduledAgentsAvailability, agentAssignmentTracker);
-                        logger.info("agentAvailabilityList - {}", agentAvailabilityList);
-                        if (agentAvailabilityList != null && !agentAvailabilityList.isEmpty()) {
+                        logger.info("{} - agentAvailabilityList - {}", record.value(),agentAvailabilityList);
+                        // if (agentAvailabilityList != null && !agentAvailabilityList.isEmpty()) {
+                        if (!agentAvailabilityList.equals("[]")) {
                             String userId = utils.nominateUserForAssignment(agentAvailabilityList);
                             // System.out.println(userId);
                             boolean assignmentStatus = dbUtils.assignCaseToAgent(record.value(), userId);
@@ -102,10 +104,10 @@ public class CasesConsumer {
                                 logger.info("CaseID[{}] Assignment to Agent[{}] Failed", record.value(), userId);
                             }
                         } else {
-                            logger.error("No Object found for Agent Assignment Tracker");
+                            logger.error("{} - No Object found for Agent Assignment Tracker",record.value());
                         }
                     } else {
-                        logger.info("There are no Available Agents");
+                        logger.info("There are no Available Agents at - {} - {}",availabilityDateTime,record.value());
                     }
                 } catch (SQLException ex) {
                     logger.error("getScheduledAgentsAndAvailability - Exception - {}", ex.getMessage());
