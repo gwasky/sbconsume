@@ -219,33 +219,6 @@ public class Utils {
         return json;
     }
 
-    public void sendSMS1(String message,List<String> phoneNumbers) {
-
-        for(String phoneNumber: phoneNumbers) {
-            System.out.println(phoneNumber);
-            String urlParameters = "user=Ricky2015&password=123456&sender=New-world&message=" +message+"&receiver="+phoneNumber;
-            byte[] postData = urlParameters.getBytes(StandardCharsets.UTF_8);
-            int postDataLength = postData.length;
-            String request = "http://caresmsgroup.com/api.php";
-            try {
-                URL url = new URL(request);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setDoOutput(true);
-                conn.setInstanceFollowRedirects(false);
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-                conn.setRequestProperty("charset", "utf-8");
-                conn.setRequestProperty("Content-Length", Integer.toString(postDataLength));
-                conn.setUseCaches(false);
-                try (DataOutputStream wr = new DataOutputStream(conn.getOutputStream())) {
-                    wr.write(postData);
-                }
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            }
-        }
-    }
-
     public void sendSMS(String message,List<String> phoneNumbers) throws Exception {
 
         HttpPost post = new HttpPost("http://caresmsgroup.com/api.php");
