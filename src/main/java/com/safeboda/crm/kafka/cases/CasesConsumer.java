@@ -9,10 +9,7 @@ import com.safeboda.crm.utils.AgentAvailability;
 import com.safeboda.crm.utils.DBUtils;
 import com.safeboda.crm.utils.Utils;
 import org.apache.kafka.clients.KafkaClient;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,29 +28,31 @@ public class CasesConsumer {
         Utils utils = new Utils();
         DBUtils dbUtils = new DBUtils();
         Properties props = utils.loadProperties();
-        String bootstrapServers = null;
-        if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("production")) {
-            bootstrapServers = System.getenv("BROKER");
-        } else {
-            bootstrapServers = props.getProperty("kafka.bootstrap.server");
-        }
+//        String bootstrapServers = null;
+//        if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("production")) {
+//            bootstrapServers = System.getenv("BROKER");
+//        } else {
+//            bootstrapServers = props.getProperty("kafka.bootstrap.server");
+//        }
+//
+//        logger.info("BROKER - {}", bootstrapServers);
+//        String groupId = "backoffice-assignment-application";
+//        String topic = props.getProperty("kafka.backoffice.topic");
+//
+//        // Create consume Configs
+//        Properties properties = new Properties();
+//        properties.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+//        properties.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+//        properties.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+//        properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+//        properties.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+//        properties.put("enable.auto.commit", "false");
 
-        logger.info("BROKER - {}", bootstrapServers);
-        String groupId = "backoffice-assignment-application";
-        String topic = props.getProperty("kafka.backoffice.topic");
-
-        // Create consume Configs
-        Properties properties = new Properties();
-        properties.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        properties.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-        properties.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-        properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
-        properties.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-
+        String consumerTopic = props.getProperty("kafka.backoffice.topic");
+        Properties consumerProps = utils.getConsumerProperties();
         // Create Consumer
-        KafkaConsumer<String, String> consumer = new KafkaConsumer<String, String>(properties);
-        consumer.subscribe(Arrays.asList(topic));
-
+        KafkaConsumer<String, String> consumer = new KafkaConsumer<String, String>(consumerProps);
+        consumer.subscribe(Arrays.asList(consumerTopic));
         try {
             //  poll for new data
             while (true) {
@@ -79,6 +78,7 @@ public class CasesConsumer {
                                 } catch (Exception ex) {
                                     logger.error("{} - Error Initializing Object in Redis - {}", record.value(), ex.getMessage());
                                     ex.printStackTrace();
+                                    utils.produceRecord(props.getProperty("kafka.backoffice.retry_topic"), record.value());
                                 }
                             } else {
                                 try {
@@ -86,6 +86,7 @@ public class CasesConsumer {
                                 } catch (Exception ex) {
                                     logger.error("{} - Error Fetching Availability Object from Redis - {}", record.value(), ex.getMessage());
                                     ex.printStackTrace();
+                                    utils.produceRecord(props.getProperty("kafka.backoffice.retry_topic"), record.value());
                                 }
                             }
                             // logger.info(agentAssignmentTracker);
@@ -100,27 +101,37 @@ public class CasesConsumer {
                                     // Update Assignment Counts for the day
                                     String updatedAgentTracker = utils.updateAssignmentCounts(availabilityDate, agentAvailabilityList, userId);
                                     logger.info("Successful | refreshed Counts | {}", updatedAgentTracker);
+                                    try {
+                                        // Commit Offsets are you finish handling the messages from each partition
+                                        // consumer.commitAsync(Collections.singletonMap(record.partition(), new OffsetAndMetadata(record.offset() + 1)));
+                                    } catch (CommitFailedException e){
+
+                                    }
+
                                 } else {
                                     logger.info("CaseID[{}] Assignment to Agent[{}] Failed", record.value(), userId);
-                                    // Send to DLQ
+                                    // Send to Retry Topic
                                 }
                             } else {
                                 logger.error("{} - No Object found for Agent Assignment Tracker", record.value());
+                                utils.produceRecord(props.getProperty("kafka.backoffice.retry_topic"), record.value());
                             }
                         } else {
                             logger.info("There are no Available Agents at - {} - {}", availabilityDateTime, record.value());
                         }
                     } catch (SQLException ex) {
                         logger.error("getScheduledAgentsAndAvailability - Exception - {}", ex.getMessage());
+                        utils.produceRecord(props.getProperty("kafka.backoffice.retry_topic"), record.value());
                     } catch (Exception ex) {
                         ex.printStackTrace();
+                        utils.produceRecord(props.getProperty("kafka.backoffice.retry_topic"), record.value());
                     }
                 }
             }
-
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
+            // Closing will Clean up Sockets in use, alert the coordinator about the consumer's departure from a group
             consumer.close();
         }
     }

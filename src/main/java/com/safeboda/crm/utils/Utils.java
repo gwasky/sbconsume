@@ -17,6 +17,10 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.producer.*;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import redis.clients.jedis.Jedis;
@@ -38,6 +42,77 @@ public class Utils {
     private String configFileName = "config.local.properties";
 
     public Utils() {
+    }
+
+
+    public Properties getProducerProperties() {
+        Properties props = loadProperties();
+        String bootstrapServers = null;
+        if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("production")) {
+            bootstrapServers = System.getenv("BROKER");
+        } else {
+            bootstrapServers = props.getProperty("kafka.bootstrap.server");
+        }
+        logger.info("BROKER - {}", bootstrapServers);
+
+        // Create consume Configs
+        Properties properties = new Properties();
+        properties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        properties.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        properties.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        return properties;
+    }
+
+    public void produceRecord(String topic, String message) {
+        try {
+
+            Properties properties = getProducerProperties();
+            // Create the Producer
+            KafkaProducer<String, String> producer = new KafkaProducer<String, String>(properties);
+            // Create a producer Record
+            ProducerRecord<String, String> record = new ProducerRecord<>(topic, message);
+            // producer.send(record);
+            producer.send(record, new Callback() {
+                @Override
+                public void onCompletion(RecordMetadata recordMetadata, Exception e) {
+                    // runs whenever a record is successfully produced or throws an exception if it failed
+                    if (e == null) {
+                        // if exception is null,
+                        logger.info("Received new Metadata, Offset {}", recordMetadata.offset());
+                    } else {
+                        logger.error("Error Producing - {}", message);
+                        e.printStackTrace();
+                    }
+                }
+            });
+        } catch (Exception ex){
+            logger.error("Error Producing");
+        }
+        // Wait until data is produced, this makes the producer synchronous
+        // producer.flush();
+        // producer.close();
+    }
+
+    public Properties getConsumerProperties() {
+        Properties props = loadProperties();
+        String bootstrapServers = null;
+        if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("production")) {
+            bootstrapServers = System.getenv("BROKER");
+        } else {
+            bootstrapServers = props.getProperty("kafka.bootstrap.server");
+        }
+        logger.info("BROKER - {}", bootstrapServers);
+        String groupId = "backoffice-assignment-application";
+
+        // Create consume Configs
+        Properties properties = new Properties();
+        properties.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        properties.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        properties.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+        properties.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        properties.put("enable.auto.commit", "false");
+        return properties;
     }
 
     public Properties loadProperties() {
@@ -219,11 +294,11 @@ public class Utils {
         return json;
     }
 
-    public void sendSMS(String message,List<String> phoneNumbers) throws Exception {
+    public void sendSMS(String message, List<String> phoneNumbers) throws Exception {
 
         HttpPost post = new HttpPost("http://caresmsgroup.com/api.php");
 
-        for(String phoneNumber: phoneNumbers) {
+        for (String phoneNumber : phoneNumbers) {
             // add request parameter, form parameters
             List<NameValuePair> urlParameters = new ArrayList<>();
             urlParameters.add(new BasicNameValuePair("user", "Ricky2015"));

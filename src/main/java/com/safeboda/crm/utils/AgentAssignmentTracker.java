@@ -1,5 +1,7 @@
 package com.safeboda.crm.utils;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * @author Gibson Wasukira
  * @created 23/06/2021 - 6:59 PM
@@ -12,7 +14,7 @@ public class AgentAssignmentTracker {
     private int count;
 
     public AgentAssignmentTracker(String agentId, String agentAvailability, int count) {
-        this.agentId = agentId;
+        this.agentId = requireNonNull(agentId);
         this.agentAvailability = agentAvailability;
         this.count = count;
     }
