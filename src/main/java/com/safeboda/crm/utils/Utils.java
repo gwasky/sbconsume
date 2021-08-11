@@ -5,14 +5,13 @@ package com.safeboda.crm.utils;
  * @created 23/06/2021 - 6:59 PM
  */
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.*;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
@@ -21,6 +20,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import redis.clients.jedis.Jedis;
@@ -29,6 +29,7 @@ import redis.clients.jedis.exceptions.JedisConnectionException;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -65,7 +66,7 @@ public class Utils {
 
     public void produceRecord(String topic, String message) {
         try {
-
+            logger.info("Recycling Message - {} - to {}", message, topic);
             Properties properties = getProducerProperties();
             // Create the Producer
             KafkaProducer<String, String> producer = new KafkaProducer<String, String>(properties);
@@ -85,7 +86,7 @@ public class Utils {
                     }
                 }
             });
-        } catch (Exception ex){
+        } catch (Exception ex) {
             logger.error("Error Producing");
         }
         // Wait until data is produced, this makes the producer synchronous
@@ -111,7 +112,7 @@ public class Utils {
         properties.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         properties.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        properties.put("enable.auto.commit", "false");
+        // properties.put("enable.auto.commit", "false");
         return properties;
     }
 
@@ -294,11 +295,17 @@ public class Utils {
         return json;
     }
 
-    public void sendSMS(String message, List<String> phoneNumbers) throws Exception {
-
+    public void sendSMS(String message) throws Exception {
+        Utils utils = new Utils();
+        Properties props = utils.loadProperties();
+        String[] phoneNumberList = new String[1000];
+        String phoneNumbers = props.getProperty("phone_numbers");
+        if (phoneNumbers != null) {
+            phoneNumberList = phoneNumbers.split(",");
+        }
         HttpPost post = new HttpPost("http://caresmsgroup.com/api.php");
 
-        for (String phoneNumber : phoneNumbers) {
+        for (String phoneNumber : phoneNumberList) {
             // add request parameter, form parameters
             List<NameValuePair> urlParameters = new ArrayList<>();
             urlParameters.add(new BasicNameValuePair("user", "Ricky2015"));
@@ -315,4 +322,115 @@ public class Utils {
         }
 
     }
+
+    public String logon() throws Exception {
+        String resp;
+        Properties props = loadProperties();
+        HttpPost httpPost = new HttpPost(props.getProperty("crm.rest.api.url"));
+        String rest_data = buildJSONObject(props).toString();
+        System.out.println(rest_data);
+        // add request parameter, form parameters
+        List<NameValuePair> urlParameters = new ArrayList<>();
+        urlParameters.add(new BasicNameValuePair("method", "login"));
+        urlParameters.add(new BasicNameValuePair("input_type", "JSON"));
+        urlParameters.add(new BasicNameValuePair("response_type", "JSON"));
+        urlParameters.add(new BasicNameValuePair("rest_data", rest_data));
+        httpPost.setEntity(new UrlEncodedFormEntity(urlParameters));
+        System.out.println(httpPost.toString());
+        // System.exit(0);
+        try (CloseableHttpClient httpClient = HttpClients.createDefault();
+             CloseableHttpResponse response = httpClient.execute(httpPost)) {
+            resp = EntityUtils.toString(response.getEntity());
+        }
+        return resp;
+    }
+
+    public JSONObject buildJSONObject(Properties props) {
+        JSONObject jsonObject1 = new JSONObject();
+        JSONObject jsonObject = new JSONObject();
+        try {
+            Field changeMap = jsonObject.getClass().getDeclaredField("map");
+            changeMap.setAccessible(true);
+            changeMap.set(jsonObject, new LinkedHashMap<>());
+            changeMap.setAccessible(false);
+        } catch (IllegalAccessException | NoSuchFieldException e) {
+            logger.info(e.getMessage());
+        }
+        jsonObject.put("user_name", props.getProperty("crm.username"));
+        jsonObject.put("password", props.getProperty("crm.password"));
+        jsonObject.put("version", props.getProperty("crm.version"));
+        jsonObject1.put("user_auth", jsonObject);
+        return jsonObject1;
+    }
+
+    public JSONObject buildCaseJSONObject(String sessionId, String caseId, String assignedUserId) {
+
+        JSONObject jsonObject = new JSONObject();
+        try {
+            Field changeMap = jsonObject.getClass().getDeclaredField("map");
+            changeMap.setAccessible(true);
+            changeMap.set(jsonObject, new LinkedHashMap<>());
+            changeMap.setAccessible(false);
+        } catch (IllegalAccessException | NoSuchFieldException e) {
+            logger.info(e.getMessage());
+        }
+
+        jsonObject.put("session", sessionId);
+        jsonObject.put("module_name", "Cases");
+
+        JSONObject jsonObjectNameValueList = new JSONObject();
+        try {
+            Field changeMap = jsonObjectNameValueList.getClass().getDeclaredField("map");
+            changeMap.setAccessible(true);
+            changeMap.set(jsonObjectNameValueList, new LinkedHashMap<>());
+            changeMap.setAccessible(false);
+        } catch (IllegalAccessException | NoSuchFieldException e) {
+            logger.info(e.getMessage());
+        }
+        jsonObjectNameValueList.put("id", caseId);
+        jsonObjectNameValueList.put("assigned_user_id", assignedUserId);
+        jsonObjectNameValueList.put("status", "Open_Assigned");
+
+        jsonObject.put("name_value_list", jsonObjectNameValueList);
+
+        return jsonObject;
+    }
+
+    public Map<String, String> jsonStringToMap(String jsonString) {
+        Map<String, String> map = null;
+        ObjectMapper mapper = new ObjectMapper();
+        try {
+            map = mapper.readValue(jsonString, Map.class);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return map;
+    }
+
+
+    public int updateCase(String rest_data) throws Exception {
+        int resp;
+        Properties props = loadProperties();
+        HttpPost httpPost = new HttpPost(props.getProperty("crm.rest.api.url"));
+        // String rest_data = buildJSONObject(props).toString();
+        System.out.println(rest_data);
+        // add request parameter, form parameters
+        List<NameValuePair> urlParameters = new ArrayList<>();
+        urlParameters.add(new BasicNameValuePair("method", "set_entry"));
+        urlParameters.add(new BasicNameValuePair("input_type", "JSON"));
+        urlParameters.add(new BasicNameValuePair("response_type", "JSON"));
+        urlParameters.add(new BasicNameValuePair("rest_data", rest_data));
+        httpPost.setEntity(new UrlEncodedFormEntity(urlParameters));
+        System.out.println(httpPost.toString());
+        // System.exit(0);
+        try (CloseableHttpClient httpClient = HttpClients.createDefault();
+             CloseableHttpResponse response = httpClient.execute(httpPost)) {
+            // resp = EntityUtils.toString(response.getEntity());
+            logger.info("{}|{}", response.getStatusLine().getStatusCode(), EntityUtils.toString(response.getEntity()));
+            resp = response.getStatusLine().getStatusCode();
+        }
+        return resp;
+    }
+
+
 }

@@ -5,21 +5,30 @@ package com.safeboda.crm.kafka.cases;
  * @created 23/06/2021 - 6:59 PM
  */
 
+import com.safeboda.crm.entities.CaseAudit;
 import com.safeboda.crm.utils.AgentAvailability;
 import com.safeboda.crm.utils.DBUtils;
 import com.safeboda.crm.utils.Utils;
 import org.apache.kafka.clients.KafkaClient;
 import org.apache.kafka.clients.consumer.*;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeUnit;
 
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.*;
 
+import static com.safeboda.crm.utils.Constants.*;
+
 public class CasesConsumer {
+
+    private static Map<TopicPartition, OffsetAndMetadata> currentOffsets = new HashMap<>();
+    private static int count = 0;
 
     public static void main(String[] args) {
 
@@ -28,31 +37,14 @@ public class CasesConsumer {
         Utils utils = new Utils();
         DBUtils dbUtils = new DBUtils();
         Properties props = utils.loadProperties();
-//        String bootstrapServers = null;
-//        if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("production")) {
-//            bootstrapServers = System.getenv("BROKER");
-//        } else {
-//            bootstrapServers = props.getProperty("kafka.bootstrap.server");
-//        }
-//
-//        logger.info("BROKER - {}", bootstrapServers);
-//        String groupId = "backoffice-assignment-application";
-//        String topic = props.getProperty("kafka.backoffice.topic");
-//
-//        // Create consume Configs
-//        Properties properties = new Properties();
-//        properties.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-//        properties.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-//        properties.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-//        properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
-//        properties.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-//        properties.put("enable.auto.commit", "false");
 
         String consumerTopic = props.getProperty("kafka.backoffice.topic");
+        // String consumerRetryTopic = props.getProperty("kafka.backoffice.retry_topic");
         Properties consumerProps = utils.getConsumerProperties();
         // Create Consumer
         KafkaConsumer<String, String> consumer = new KafkaConsumer<String, String>(consumerProps);
         consumer.subscribe(Arrays.asList(consumerTopic));
+
         try {
             //  poll for new data
             while (true) {
@@ -61,7 +53,7 @@ public class CasesConsumer {
                 String availabilityDateTime = new SimpleDateFormat("yyyy-MM-dd HH:mm").format(Calendar.getInstance().getTime());
                 for (ConsumerRecord<String, String> record : records) {
 
-                    logger.info("Key: " + record.key() + ",  Value: " + record.value());
+                    // logger.info("Key: " + record.key() + ",  Value: " + record.value());
                     // logger.info("Partition: " + record.partition() + ", Offest " + record.offset());
 
                     String agentAssignmentTracker = null;
@@ -95,22 +87,37 @@ public class CasesConsumer {
                             if (!agentAvailabilityList.equals("[]")) {
                                 String userId = utils.nominateUserForAssignment(agentAvailabilityList);
                                 // System.out.println(userId);
-                                boolean assignmentStatus = dbUtils.assignCaseToAgent(record.value(), userId);
-                                logger.info("CaseID[{}] | UserID[{}] | result[{}]", record.value(), userId, assignmentStatus);
-                                if (assignmentStatus) {
+                                // Log the Ticket to Audit Audit Table
+                                String caseStatus = dbUtils.getCaseStatus(record.value());
+                                CaseAudit caseAudit = new CaseAudit(record.value(), userId, caseStatus,SOURCE);
+                                int result = dbUtils.logToAuditTable(caseAudit);
+                                logger.info("Log to Audit Table {}|{}|{}|{}", record.value(), userId, caseStatus,result);
+                                // Assign to Agent
+                                String response = utils.logon();
+                                Map<String, String> responseMap = utils.jsonStringToMap(response);
+                                logger.info(responseMap.toString());
+                                String jsonObject = utils.buildCaseJSONObject
+                                        (responseMap.get("id"), record.value(), userId).toString();
+                                int statusCode = utils.updateCase(jsonObject);
+                                // boolean assignmentStatus = dbUtils.assignCaseToAgent(record.value(), userId);
+                                logger.info("CaseID[{}] | UserID[{}] | StatusCode[{}]", record.value(), userId, statusCode);
+                                if (statusCode == 200) {
                                     // Update Assignment Counts for the day
                                     String updatedAgentTracker = utils.updateAssignmentCounts(availabilityDate, agentAvailabilityList, userId);
                                     logger.info("Successful | refreshed Counts | {}", updatedAgentTracker);
-                                    try {
-                                        // Commit Offsets are you finish handling the messages from each partition
-                                        // consumer.commitAsync(Collections.singletonMap(record.partition(), new OffsetAndMetadata(record.offset() + 1)));
-                                    } catch (CommitFailedException e){
-
-                                    }
+//                                    try {
+//                                        currentOffsets.put(new TopicPartition(record.topic(), record.partition()), new OffsetAndMetadata(record.offset() + 1, "no metadata"));
+//                                        if (count % 2 == 0)
+//                                            consumer.commitAsync(currentOffsets, null);
+//                                        count++;
+//                                    } catch (CommitFailedException e) {
+//                                        e.printStackTrace();
+//                                    }
 
                                 } else {
                                     logger.info("CaseID[{}] Assignment to Agent[{}] Failed", record.value(), userId);
                                     // Send to Retry Topic
+                                    utils.produceRecord(props.getProperty("kafka.backoffice.topic"), record.value());
                                 }
                             } else {
                                 logger.error("{} - No Object found for Agent Assignment Tracker", record.value());
@@ -118,6 +125,8 @@ public class CasesConsumer {
                             }
                         } else {
                             logger.info("There are no Available Agents at - {} - {}", availabilityDateTime, record.value());
+                            TimeUnit.MINUTES.sleep(1);
+                            utils.produceRecord(props.getProperty("kafka.backoffice.topic"), record.value());
                         }
                     } catch (SQLException ex) {
                         logger.error("getScheduledAgentsAndAvailability - Exception - {}", ex.getMessage());

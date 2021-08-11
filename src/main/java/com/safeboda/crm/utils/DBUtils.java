@@ -6,61 +6,67 @@ package com.safeboda.crm.utils;
  */
 
 import com.mysql.cj.jdbc.MysqlDataSource;
+import com.safeboda.crm.entities.CaseAudit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+//import java.util.logging.Level;
+//import java.util.logging.Logger;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.Properties;
+
+import static com.safeboda.crm.utils.Constants.*;
 
 public class DBUtils {
 
     private String availabilityDate;
     Logger logger = LoggerFactory.getLogger(DBUtils.class.getName());
-    private String configFileName = "config.properties";
-    private String query = "select \n" +
-            "\tscheduler.schedule_from_date,\n" +
-            "\tscheduler.schedule_to_date,\n" +
-            "\tscheduled_agents.name agent_name,\n" +
-            "\tscheduled_agents.user_id_c,\n" +
-            "\tagent_availability.name availability_date,\n" +
-            "\tagent_availability.date_entered,\n" +
-            "\tagent_availability.available\n" +
-            "from bo_bo_scheduler scheduler\n" +
-            "left outer join bo_bo_scheduler_bo_bo_scheduled_agents_c scheduled_agents_j on scheduler.id = scheduled_agents_j.bo_bo_scheduler_bo_bo_scheduled_agentsbo_bo_scheduler_ida\n" +
-            "left outer join bo_bo_scheduled_agents scheduled_agents on scheduled_agents.id = scheduled_agents_j.bo_bo_scheduler_bo_bo_scheduled_agentsbo_bo_scheduled_agents_idb \n" +
-            "left outer join bo_bo_scheduled_agents_bo_bo_agent_availability_c agent_availability_j on agent_availability_j.bo_bo_scheadd3_agents_ida = scheduled_agents.id\n" +
-            "left outer join bo_bo_agent_availability agent_availability on agent_availability_j.bo_bo_schee90fability_idb = agent_availability.id\n" +
-            "left outer join bo_bo_schedule_slots slots on slots.id = scheduled_agents.bo_bo_schedule_slots_id_c\n" +
-            "where agent_availability.name = ? and agent_availability.available = 'yes'\n" +
-            "\tand convert(replace(substring(time(date_sub(UTC_TIMESTAMP(), interval -3 hour)),1,5),':',''),unsigned integer) >= convert(substring_index(slots.name,'|',1),unsigned integer)\n" +
-            "\tand convert(replace(substring(time(date_sub(UTC_TIMESTAMP(), interval -3 hour)),1,5),':',''),unsigned integer) < convert(substring_index(slots.name,'|',-1),unsigned integer)";
+    //private static final Logger logger = Logger.getLogger("BUNDLE-SERVICE");
+    private String configFileName = "config.local.properties";
 
-    private String assignCaseQuery = "update cases set assigned_user_id = ? where id = ?";
 
     public DBUtils() {
     }
 
-    public DBUtils(String availabilityDate) {
-        // this.availabilityDate = availabilityDate;
-    }
 
-    public Connection getDBConnection(){
+    public Connection getDBConnection() {
         Utils utils = new Utils();
         Connection conn = null;
+        // logger.info("Env - {}", System.getenv("OP_ENV"));
+        if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("production")) {
+            configFileName = "config.properties";
+        }
         try {
             Properties properties = utils.loadProperties();
             MysqlDataSource dataSource = new MysqlDataSource();
-            dataSource.setUser(properties.getProperty("db.user"));
-            dataSource.setPassword(properties.getProperty("db.password"));
-            dataSource.setServerName(properties.getProperty("db.server"));
-            dataSource.setPortNumber(Integer.parseInt(properties.getProperty("db.port")));
-            dataSource.setDatabaseName(properties.getProperty("db.name"));
+            dataSource.setUser(properties.getProperty("db.crm.user"));
+            dataSource.setPassword(properties.getProperty("db.crm.password"));
+            dataSource.setServerName(properties.getProperty("db.crm.server"));
+            dataSource.setPortNumber(Integer.parseInt(properties.getProperty("db.crm.port")));
+            dataSource.setDatabaseName(properties.getProperty("db.crm.name"));
             conn = dataSource.getConnection();
-        } catch (Exception ex){
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        return conn;
+    }
+
+    public Connection getPostgresDBConnection() {
+        Utils utils = new Utils();
+        Connection conn = null;
+        logger.info("Env - {}", System.getenv("OP_ENV"));
+        if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("production")) {
+            configFileName = "config.properties";
+        }
+        try {
+            Properties properties = utils.loadProperties();
+            Properties props = new Properties();
+            props.setProperty("user", properties.getProperty("db.dwh.user"));
+            props.setProperty("password", properties.getProperty("db.dwh.password"));
+            Class.forName("org.postgresql.Driver");
+            conn = DriverManager.getConnection(properties.getProperty("db.dwh.url"), props);
+        } catch (Exception ex) {
             ex.printStackTrace();
         }
         return conn;
@@ -72,12 +78,12 @@ public class DBUtils {
         Connection conn = null;
         PreparedStatement preparedStatement = null;
         ResultSet resultSet = null;
-        try{
+        try {
             conn = getDBConnection();
-            preparedStatement = conn.prepareStatement(query);
-            preparedStatement.setString(1,availabilityDate);
+            preparedStatement = conn.prepareStatement(QUERY_GET_AVAILABLE_AGENTS);
+            preparedStatement.setString(1, availabilityDate);
             resultSet = preparedStatement.executeQuery();
-            while (resultSet.next()){
+            while (resultSet.next()) {
                 String scheduleFromDate = resultSet.getString("schedule_from_date");
                 String scheduleToDate = resultSet.getString("schedule_to_date");
                 String agentName = resultSet.getString("agent_name");
@@ -85,52 +91,101 @@ public class DBUtils {
                 String availabitityDate = resultSet.getString("availability_date");
                 String dateEntered = resultSet.getString("date_entered");
                 String availabile = resultSet.getString("available");
-                AgentAvailability agentAvailability = new AgentAvailability(scheduleFromDate,scheduleToDate,agentName,agentID,availabitityDate,dateEntered,availabile);
+                AgentAvailability agentAvailability = new AgentAvailability(scheduleFromDate, scheduleToDate, agentName, agentID, availabitityDate, dateEntered, availabile);
                 // logger.info(String.valueOf(agentAvailability));
                 agents.add(agentAvailability);
             }
-        }catch (Exception e){
-            logger.error(e.getMessage());
-        }finally {
-            if (preparedStatement != null){
-                try{
+        } catch (Exception e) {
+            e.printStackTrace();
+            // logger.log(Level.INFO, "{0}", new Object[]{e});
+        } finally {
+            if (preparedStatement != null) {
+                try {
                     preparedStatement.close();
-                }catch (Exception ex){
+                } catch (Exception ex) {
                     logger.error(ex.getMessage());
                 }
             }
-            if (conn != null){
+            if (conn != null) {
                 conn.close();
             }
-            if (resultSet != null){
+            if (resultSet != null) {
                 resultSet.close();
             }
         }
         return agents;
     }
 
-    public boolean assignCaseToAgent(String caseId,String userId){
-        Connection conn = null;
+    public boolean assignCaseToAgent(String caseId, String userId) {
+        Connection conn;
         boolean status = false;
         try {
             conn = getDBConnection();
+            String assignCaseQuery = "update cases set assigned_user_id = ? where id = ?";
             PreparedStatement preparedStatement = conn.prepareStatement(assignCaseQuery);
-            preparedStatement.setString(1,userId);
-            preparedStatement.setString(2,caseId);
+            preparedStatement.setString(1, userId);
+            preparedStatement.setString(2, caseId);
             int x = preparedStatement.executeUpdate();
-            System.out.println(x);
-            if (x == 1) status=true;
-        }catch (SQLException ex){
+            // System.out.println(x);
+            if (x == 1) status = true;
+            conn.close();
+        } catch (SQLException ex) {
             logger.error(ex.getMessage());
-        }catch (Exception ex){
+        } catch (Exception ex) {
             logger.error(ex.getMessage());
         }
         return status;
     }
 
+    public String getCaseStatus(String caseId) {
+        Connection conn;
+        String status = null;
+        try {
+            conn = getDBConnection();
+            PreparedStatement preparedStatement = conn.prepareStatement(QUERY_GET_CASE_STATUS);
+            preparedStatement.setString(1, caseId);
+            ResultSet rs = preparedStatement.executeQuery();
+            while (rs.next()) {
+                status = rs.getString("status");
+            }
+            rs.close();
+            preparedStatement.close();
+            conn.close();
+        } catch (SQLException ex) {
+            logger.error(ex.getMessage());
+        } catch (Exception ex) {
+            logger.error(ex.getMessage());
+        }
+        return status;
+    }
 
-
-
+    public int logToAuditTable(CaseAudit caseAudit) {
+        Connection conn = null;
+        int status = 0;
+        try {
+            conn = getPostgresDBConnection();
+            // Create table if it doesnt exist
+            PreparedStatement ps = conn.prepareStatement(QUERY_CREATE_CASE_AUDIT_TABLE);
+            int ddl = ps.executeUpdate();
+            ps.close();
+            if (ddl == 1) logger.info("Created Case Audit Table - {}", ddl);
+            PreparedStatement preparedStatement = conn.prepareStatement(QUERY_LOG_TO_CASE_AUDIT);
+            preparedStatement.setString(1, caseAudit.getUserId());
+            preparedStatement.setString(2, caseAudit.getCaseId());
+            preparedStatement.setString(3, caseAudit.getCaseStatus());
+            preparedStatement.setString(4, caseAudit.getSource());
+            status = preparedStatement.executeUpdate();
+            logger.info("Logging Assigned Case to Audit | {} {} {} | {}", caseAudit.getUserId(), caseAudit.getCaseId(), caseAudit.getCaseStatus(), status);
+            preparedStatement.close();
+            conn.close();
+        } catch (SQLException ex) {
+            logger.error("SQL State : {} {}", ex.getSQLState(), ex.getMessage());
+            ex.printStackTrace();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        return status;
+    }
 
 
 }
