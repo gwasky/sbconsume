@@ -98,6 +98,7 @@ public class CasesConsumer {
                             String agentAvailabilityList = utils.updateAvailabilityTrackerWithNewlyAvailableAgents(availabilityDate, scheduledAgentsAvailability, agentAssignmentTracker);
                             logger.info("{} - agentAvailabilityList - {}", queueAudit.getCaseId(), agentAvailabilityList);
                             if (!agentAvailabilityList.equals("[]")) {
+                                // Check there's an Agent available from the Department/Queue the ticket is assigned to
                                 String userId = utils.nominateUserForAssignment(agentAvailabilityList, deptName);
                                 if (userId != null) {
                                     // Log the Ticket to Audit Audit Table
