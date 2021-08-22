@@ -11,7 +11,6 @@ import org.apache.http.NameValuePair;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
@@ -25,15 +24,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.exceptions.JedisConnectionException;
-
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -49,11 +42,15 @@ public class Utils {
     public Properties getProducerProperties() {
         Properties props = loadProperties();
         String bootstrapServers = null;
+
         if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("production")) {
-            bootstrapServers = System.getenv("BROKER");
-        } else {
-            bootstrapServers = props.getProperty("kafka.bootstrap.server");
+            configFileName = "config.properties";
+        } else if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("dev")){
+            configFileName = "config.dev.docker.properties";
         }
+
+        bootstrapServers = props.getProperty("kafka.bootstrap.server");
+
         logger.info("BROKER - {}", bootstrapServers);
 
         // Create consume Configs
@@ -97,12 +94,17 @@ public class Utils {
     public Properties getConsumerProperties() {
         Properties props = loadProperties();
         String bootstrapServers = null;
+
         if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("production")) {
-            bootstrapServers = System.getenv("BROKER");
-        } else {
-            bootstrapServers = props.getProperty("kafka.bootstrap.server");
+            configFileName = "config.properties";
+        } else if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("dev")){
+            configFileName = "config.dev.docker.properties";
         }
+
+        bootstrapServers = props.getProperty("kafka.bootstrap.server");
+
         logger.info("BROKER - {}", bootstrapServers);
+
         String groupId = "backoffice-assignment-application";
 
         // Create consume Configs
@@ -120,6 +122,8 @@ public class Utils {
 
         if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("production")) {
             configFileName = "config.properties";
+        } else if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("dev")){
+            configFileName = "config.dev.docker.properties";
         }
         // Load Properties file from classpath
         Properties properties = new Properties();

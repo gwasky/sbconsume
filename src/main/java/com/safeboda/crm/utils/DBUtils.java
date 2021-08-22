@@ -36,6 +36,8 @@ public class DBUtils {
         // logger.info("Env - {}", System.getenv("OP_ENV"));
         if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("production")) {
             configFileName = "config.properties";
+        } else if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("dev")){
+            configFileName = "config.dev.docker.properties";
         }
         try {
             Properties properties = utils.loadProperties();
@@ -55,9 +57,11 @@ public class DBUtils {
     public Connection getPostgresDBConnection() {
         Utils utils = new Utils();
         Connection conn = null;
-        logger.info("Env - {}", System.getenv("OP_ENV"));
+        // logger.info("Env - {}", System.getenv("OP_ENV"));
         if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("production")) {
             configFileName = "config.properties";
+        } else if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("dev")){
+            configFileName = "config.dev.docker.properties";
         }
         try {
             Properties properties = utils.loadProperties();

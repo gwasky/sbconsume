@@ -46,6 +46,11 @@ public class CasesConsumer {
         consumer.subscribe(Arrays.asList(consumerTopic));
 
         try {
+
+            logger.info("################### DEPLOYMENT ENV #################");
+            logger.info("################### {} #################", System.getenv("OP_ENV"));
+            logger.info("################### DEPLOYMENT ENV #################");
+
             //  poll for new data
             while (true) {
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));

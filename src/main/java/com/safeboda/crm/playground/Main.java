@@ -8,6 +8,7 @@ package com.safeboda.crm.playground;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.JsonObject;
 import com.safeboda.crm.entities.CaseAudit;
+import com.safeboda.crm.entities.QueueAudit;
 import com.safeboda.crm.utils.AgentAvailability;
 import com.safeboda.crm.utils.DBUtils;
 import com.safeboda.crm.utils.Utils;
@@ -82,12 +83,12 @@ public class Main {
 //                .put("JSON3", new JSONObject().put("key1", "value1"))
 //                .toString();
 //
-        String tt = utils.logon();
-        Map<String, String> map = utils.jsonStringToMap(tt);
-        System.out.println(map);
-
-        String json2String = utils.buildCaseJSONObject
-                (map.get("id"), "2755314a-1111-ab5a-b4a2-611360b21b0a", "13e11a82-b55d-6465-a564-5e1ebd9fc2b1").toString();
+//        String tt = utils.logon();
+//        Map<String, String> map = utils.jsonStringToMap(tt);
+//        System.out.println(map);
+//
+//        String json2String = utils.buildCaseJSONObject
+//                (map.get("id"), "2755314a-1111-ab5a-b4a2-611360b21b0a", "13e11a82-b55d-6465-a564-5e1ebd9fc2b1").toString();
 //
 //        String json2String = new JSONObject()
 //                .put("session", map.get("id"))
@@ -97,15 +98,15 @@ public class Main {
 //                        .put("assigned_user_id", "b44c3327-f243-b37f-34cd-60ec344e1131")
 //                )
 //                .toString();
-
-        System.out.println(json2String);
-
-        int statusCode = utils.updateCase(json2String);
-
-        if (statusCode == 200) {
-            System.out.println("Success");
-        }
-        System.out.println(statusCode);
+//
+//        System.out.println(json2String);
+//
+//        int statusCode = utils.updateCase(json2String);
+//
+//        if (statusCode == 200) {
+//            System.out.println("Success");
+//        }
+//        System.out.println(statusCode);
 
 //        String tt = utils.logon();
 //        Map <String,String> map = utils.jsonStringToMap(tt);
@@ -152,6 +153,12 @@ public class Main {
 //            jsonObject.put("name_value_list", jsonObjectNameValueList);
 //
 //            System.out.println(jsonObject.toString());
+
+
+    String str = "{\"boQueueId\":\"24b8bc5a-428e-9b66-6324-5e4b7c976dfe\",\"caseId\":\"82ed4f8d-8f08-9b0a-28e8-612205774b92\"}";
+        ObjectMapper objectMapper = new ObjectMapper();
+        QueueAudit queueAudit = objectMapper.readValue(str, QueueAudit.class);
+        System.out.println(queueAudit);
 
     }
 
