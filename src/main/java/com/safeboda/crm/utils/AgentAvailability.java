@@ -14,10 +14,11 @@ public class AgentAvailability {
     private String availabitityDate;
     private String dateEntered;
     private String availabile;
+    private String deptName;
     private int count;
 
 
-    public AgentAvailability(String scheduleFromDate, String scheduleToDate, String agentName,String agentID, String availabitityDate, String dateEntered, String availabile) {
+    public AgentAvailability(String scheduleFromDate, String scheduleToDate, String agentName,String agentID, String availabitityDate, String dateEntered, String availabile,String deptName) {
         this.scheduleFromDate = scheduleFromDate;
         this.scheduleToDate = scheduleToDate;
         this.agentName = agentName;
@@ -25,6 +26,7 @@ public class AgentAvailability {
         this.availabitityDate = availabitityDate;
         this.dateEntered = dateEntered;
         this.availabile = availabile;
+        this.deptName = deptName;
     }
 
     public String getScheduleFromDate() {
@@ -81,6 +83,14 @@ public class AgentAvailability {
 
     public void setAgentName(String agentName) {
         this.agentName = agentName;
+    }
+
+    public String getDeptName() {
+        return deptName;
+    }
+
+    public void setDeptName(String deptName) {
+        this.deptName = deptName;
     }
 
     @Override

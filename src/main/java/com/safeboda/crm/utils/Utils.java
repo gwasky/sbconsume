@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.exceptions.JedisConnectionException;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
@@ -45,7 +46,7 @@ public class Utils {
 
         if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("production")) {
             configFileName = "config.properties";
-        } else if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("dev")){
+        } else if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("dev")) {
             configFileName = "config.dev.docker.properties";
         }
 
@@ -97,7 +98,7 @@ public class Utils {
 
         if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("production")) {
             configFileName = "config.properties";
-        } else if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("dev")){
+        } else if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("dev")) {
             configFileName = "config.dev.docker.properties";
         }
 
@@ -122,7 +123,7 @@ public class Utils {
 
         if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("production")) {
             configFileName = "config.properties";
-        } else if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("dev")){
+        } else if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("dev")) {
             configFileName = "config.dev.docker.properties";
         }
         // Load Properties file from classpath
@@ -178,9 +179,8 @@ public class Utils {
     public String initializeObjectInRedis(String availabilityDate, ArrayList<AgentAvailability> agents) {
         ArrayList<AgentAssignmentTracker> agentTrackerList = new ArrayList<>();
         for (AgentAvailability agent : agents) {
-            AgentAssignmentTracker agentAssignmentTracker = new AgentAssignmentTracker(agent.getAgentID(), agent.getAvailabile(), 0);
+            AgentAssignmentTracker agentAssignmentTracker = new AgentAssignmentTracker(agent.getAgentID(), agent.getAvailabile(), 0,agent.getDeptName());
             agentTrackerList.add(agentAssignmentTracker);
-            //System.out.println(agent.getAgentID());
         }
         // Store
         Jedis redisClient = redisClient();
@@ -201,7 +201,7 @@ public class Utils {
         return availabilityObj;
     }
 
-    public String nominateUserForAssignment(String agents) {
+    public String nominateUserForAssignment(String agents,String deptName) {
         String userId = null;
         Gson gson = new Gson();
         ArrayList<AgentAssignmentTracker> agentsList = new ArrayList<>();
@@ -212,7 +212,9 @@ public class Utils {
         }
         logger.info(String.valueOf(agentsList));
         List<AgentAssignmentTracker> availableAgents = agentsList.stream()
-                .filter(p -> p.getAgentAvailability().endsWith("yes")).collect(Collectors.toList());
+                .filter(p -> p.getAgentAvailability().endsWith("yes")).filter(x -> x.getDeptName().equals(deptName)).collect(Collectors.toList());
+        logger.info("----------------------");
+        logger.info(String.valueOf(availableAgents));
         if (availableAgents.size() > 0) {
             AgentAssignmentTracker availableAgentWithLeastAssignments = availableAgents.stream().min(Comparator.comparing(AgentAssignmentTracker::getCount)).orElseThrow(NoSuchElementException::new);
             if (availableAgentWithLeastAssignments != null) {
@@ -284,7 +286,7 @@ public class Utils {
 
         scheduledAgentsAvailability.stream().forEach(i -> {
             if (newAvailableAgents.contains(i.getAgentID())) {
-                agentsList.add(new AgentAssignmentTracker(i.getAgentID(), "yes", 0));
+                agentsList.add(new AgentAssignmentTracker(i.getAgentID(), "yes", 0,i.getDeptName()));
             }
         });
 
@@ -434,6 +436,18 @@ public class Utils {
             resp = response.getStatusLine().getStatusCode();
         }
         return resp;
+    }
+
+    public String getDeptName(Properties properties, String queueId) {
+        String deptName = null;
+        if (properties.getProperty("queue.id.main").equals(queueId)) {
+            deptName = properties.getProperty("dept.main");
+        } else if (properties.getProperty("queue.id.perfomance").equals(queueId)) {
+            deptName = properties.getProperty("dept.perfomance");
+        } else if (properties.getProperty("queue.id.food").equals(queueId)) {
+            deptName = properties.getProperty("dept.food");
+        }
+        return deptName;
     }
 
 

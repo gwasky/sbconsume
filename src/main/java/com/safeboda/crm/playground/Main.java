@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.JsonObject;
 import com.safeboda.crm.entities.CaseAudit;
 import com.safeboda.crm.entities.QueueAudit;
+import com.safeboda.crm.utils.AgentAssignmentTracker;
 import com.safeboda.crm.utils.AgentAvailability;
 import com.safeboda.crm.utils.DBUtils;
 import com.safeboda.crm.utils.Utils;
@@ -21,6 +22,7 @@ import java.lang.reflect.Field;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class Main {
 
@@ -155,11 +157,22 @@ public class Main {
 //            System.out.println(jsonObject.toString());
 
 
-    String str = "{\"boQueueId\":\"24b8bc5a-428e-9b66-6324-5e4b7c976dfe\",\"caseId\":\"82ed4f8d-8f08-9b0a-28e8-612205774b92\"}";
-        ObjectMapper objectMapper = new ObjectMapper();
-        QueueAudit queueAudit = objectMapper.readValue(str, QueueAudit.class);
-        System.out.println(queueAudit);
-
+//        String str = "{\"boQueueId\":\"24b8bc5a-428e-9b66-6324-5e4b7c976dfe\",\"caseId\":\"82ed4f8d-8f08-9b0a-28e8-612205774b92\"}";
+//        ObjectMapper objectMapper = new ObjectMapper();
+//        QueueAudit queueAudit = objectMapper.readValue(str, QueueAudit.class);
+//        System.out.println(queueAudit);
+//        String jsonString = objectMapper.writeValueAsString(queueAudit);
+//        System.out.println(jsonString);
+//        Properties properties = utils.loadProperties();
+//
+//        String queueName = utils.getDeptName(properties,queueAudit.getBoQueueId());
+//        System.out.println(queueName);
+        String deptName = "Main1";
+        ArrayList<AgentAssignmentTracker> agentsList = new ArrayList<>();
+        agentsList.add(new AgentAssignmentTracker("d0bc1e5f-a385-a53b-9feb-5d4bc7f610e6","yes",0,"Main1"));
+        List<AgentAssignmentTracker> availableAgents = agentsList.stream()
+                .filter(p -> p.getAgentAvailability().endsWith("yes")).filter(x -> x.getDeptName().equals(deptName)).collect(Collectors.toList());
+        System.out.println(availableAgents);
     }
 
 

@@ -11,12 +11,14 @@ public class AgentAssignmentTracker {
 
     private String agentId;
     private String agentAvailability;
+    private String deptName;
     private int count;
 
-    public AgentAssignmentTracker(String agentId, String agentAvailability, int count) {
+    public AgentAssignmentTracker(String agentId, String agentAvailability, int count,String deptName) {
         this.agentId = requireNonNull(agentId);
         this.agentAvailability = agentAvailability;
         this.count = count;
+        this.deptName = deptName;
     }
 
     public AgentAssignmentTracker() {
@@ -46,11 +48,20 @@ public class AgentAssignmentTracker {
         this.count = count;
     }
 
+    public String getDeptName() {
+        return deptName;
+    }
+
+    public void setDeptName(String deptName) {
+        this.deptName = deptName;
+    }
+
     @Override
     public String toString() {
         return "AgentAssignmentTracker{" +
                 "agentId='" + agentId + '\'' +
                 ", agentAvailability='" + agentAvailability + '\'' +
+                ", deptName='" + deptName + '\'' +
                 ", count=" + count +
                 '}';
     }

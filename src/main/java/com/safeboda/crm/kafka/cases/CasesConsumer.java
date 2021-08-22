@@ -5,7 +5,9 @@ package com.safeboda.crm.kafka.cases;
  * @created 23/06/2021 - 6:59 PM
  */
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.safeboda.crm.entities.CaseAudit;
+import com.safeboda.crm.entities.QueueAudit;
 import com.safeboda.crm.utils.AgentAvailability;
 import com.safeboda.crm.utils.DBUtils;
 import com.safeboda.crm.utils.Utils;
@@ -62,9 +64,14 @@ public class CasesConsumer {
                     // logger.info("Partition: " + record.partition() + ", Offest " + record.offset());
 
                     String agentAssignmentTracker = null;
+                    // Deserialize object
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    QueueAudit queueAudit = objectMapper.readValue(record.value(), QueueAudit.class);
                     try {
-                        ArrayList<AgentAvailability> scheduledAgentsAvailability = dbUtils.getScheduledAgentsAndAvailability(availabilityDate);
-                        logger.info("{} - Number of Scheduled Agents - {}", record.value(), scheduledAgentsAvailability.size());
+                        System.out.println(queueAudit.getCaseId());
+                        String deptName = utils.getDeptName(props, queueAudit.getBoQueueId());
+                        ArrayList<AgentAvailability> scheduledAgentsAvailability = dbUtils.getScheduledAgentsAndAvailability(availabilityDate, deptName);
+                        logger.info("{} - Number of Scheduled Agents for dept[{}] - {}", queueAudit.getCaseId(), deptName, scheduledAgentsAvailability.size());
                         if (scheduledAgentsAvailability.size() > 0) {
                             // logger.info(String.valueOf(scheduledAgentsAvailability));
                             boolean exists = utils.checkForObjectRedisPersistence(availabilityDate);
@@ -73,72 +80,68 @@ public class CasesConsumer {
                                 try {
                                     agentAssignmentTracker = utils.initializeObjectInRedis(availabilityDate, scheduledAgentsAvailability);
                                 } catch (Exception ex) {
-                                    logger.error("{} - Error Initializing Object in Redis - {}", record.value(), ex.getMessage());
+                                    logger.error("{} - Error Initializing Object in Redis - {}", queueAudit.getCaseId(), ex.getMessage());
                                     ex.printStackTrace();
-                                    utils.produceRecord(props.getProperty("kafka.backoffice.retry_topic"), record.value());
+                                    utils.produceRecord(props.getProperty("kafka.backoffice.retry_topic"), new ObjectMapper().writeValueAsString(queueAudit));
                                 }
                             } else {
                                 try {
                                     agentAssignmentTracker = utils.getAvailabilityObjectFromRedis(availabilityDate);
                                 } catch (Exception ex) {
-                                    logger.error("{} - Error Fetching Availability Object from Redis - {}", record.value(), ex.getMessage());
+                                    logger.error("{} - Error Fetching Availability Object from Redis - {}", queueAudit.getCaseId(), ex.getMessage());
                                     ex.printStackTrace();
-                                    utils.produceRecord(props.getProperty("kafka.backoffice.retry_topic"), record.value());
+                                    utils.produceRecord(props.getProperty("kafka.backoffice.retry_topic"), new ObjectMapper().writeValueAsString(queueAudit));
                                 }
                             }
                             // logger.info(agentAssignmentTracker);
+                            // Update Redis Tracker with Newly Available Agents
                             String agentAvailabilityList = utils.updateAvailabilityTrackerWithNewlyAvailableAgents(availabilityDate, scheduledAgentsAvailability, agentAssignmentTracker);
-                            logger.info("{} - agentAvailabilityList - {}", record.value(), agentAvailabilityList);
+                            logger.info("{} - agentAvailabilityList - {}", queueAudit.getCaseId(), agentAvailabilityList);
                             if (!agentAvailabilityList.equals("[]")) {
-                                String userId = utils.nominateUserForAssignment(agentAvailabilityList);
-                                // System.out.println(userId);
-                                // Log the Ticket to Audit Audit Table
-                                String caseStatus = dbUtils.getCaseStatus(record.value());
-                                CaseAudit caseAudit = new CaseAudit(record.value(), userId, caseStatus,SOURCE);
-                                int result = dbUtils.logToAuditTable(caseAudit);
-                                logger.info("Log to Audit Table {}|{}|{}|{}", record.value(), userId, caseStatus,result);
-                                // Assign to Agent
-                                String response = utils.logon();
-                                Map<String, String> responseMap = utils.jsonStringToMap(response);
-                                logger.info(responseMap.toString());
-                                String jsonObject = utils.buildCaseJSONObject
-                                        (responseMap.get("id"), record.value(), userId).toString();
-                                int statusCode = utils.updateCase(jsonObject);
-                                // boolean assignmentStatus = dbUtils.assignCaseToAgent(record.value(), userId);
-                                logger.info("CaseID[{}] | UserID[{}] | StatusCode[{}]", record.value(), userId, statusCode);
-                                if (statusCode == 200) {
-                                    // Update Assignment Counts for the day
-                                    String updatedAgentTracker = utils.updateAssignmentCounts(availabilityDate, agentAvailabilityList, userId);
-                                    logger.info("Successful | refreshed Counts | {}", updatedAgentTracker);
-//                                    try {
-//                                        currentOffsets.put(new TopicPartition(record.topic(), record.partition()), new OffsetAndMetadata(record.offset() + 1, "no metadata"));
-//                                        if (count % 2 == 0)
-//                                            consumer.commitAsync(currentOffsets, null);
-//                                        count++;
-//                                    } catch (CommitFailedException e) {
-//                                        e.printStackTrace();
-//                                    }
-
+                                String userId = utils.nominateUserForAssignment(agentAvailabilityList, deptName);
+                                if (userId != null) {
+                                    // Log the Ticket to Audit Audit Table
+                                    String caseStatus = dbUtils.getCaseStatus(queueAudit.getCaseId());
+                                    CaseAudit caseAudit = new CaseAudit(queueAudit.getCaseId(), userId, caseStatus, SOURCE);
+                                    int result = dbUtils.logToAuditTable(caseAudit);
+                                    logger.info("Log to Audit Table {}|{}|{}|{}", queueAudit.getCaseId(), userId, caseStatus, result);
+                                    // Assign to Agent
+                                    String response = utils.logon();
+                                    Map<String, String> responseMap = utils.jsonStringToMap(response);
+                                    logger.info(responseMap.toString());
+                                    String jsonObject = utils.buildCaseJSONObject
+                                            (responseMap.get("id"), queueAudit.getCaseId(), userId).toString();
+                                    int statusCode = utils.updateCase(jsonObject);
+                                    // boolean assignmentStatus = dbUtils.assignCaseToAgent(queueAudit.getCaseId(), userId);
+                                    logger.info("CaseID[{}] | UserID[{}] | StatusCode[{}]", queueAudit.getCaseId(), userId, statusCode);
+                                    if (statusCode == 200) {
+                                        // Update Assignment Counts for the day
+                                        String updatedAgentTracker = utils.updateAssignmentCounts(availabilityDate, agentAvailabilityList, userId);
+                                        logger.info("Successful | refreshed Counts | {}", updatedAgentTracker);
+                                    } else {
+                                        logger.info("CaseID[{}] Assignment to Agent[{}] Failed", queueAudit.getCaseId(), userId);
+                                        // Send to Retry Topic
+                                        utils.produceRecord(props.getProperty("kafka.backoffice.topic"), new ObjectMapper().writeValueAsString(queueAudit));
+                                    }
                                 } else {
-                                    logger.info("CaseID[{}] Assignment to Agent[{}] Failed", record.value(), userId);
-                                    // Send to Retry Topic
-                                    utils.produceRecord(props.getProperty("kafka.backoffice.topic"), record.value());
+                                    logger.error("No UserID picked up at Nomination");
+                                    logger.info("Recycling Case .........................");
                                 }
                             } else {
-                                logger.error("{} - No Object found for Agent Assignment Tracker", record.value());
-                                utils.produceRecord(props.getProperty("kafka.backoffice.retry_topic"), record.value());
+                                logger.error("{} - No Object found for Agent Assignment Tracker", queueAudit.getCaseId());
+                                // utils.produceRecord(props.getProperty("kafka.backoffice.retry_topic"), record.value());
                             }
                         } else {
-                            logger.info("There are no Available Agents at - {} - {}", availabilityDateTime, record.value());
+                            logger.info("There are no Available Agents for dept[{}] - {} - {}", deptName, availabilityDateTime, queueAudit.getCaseId());
                             TimeUnit.MINUTES.sleep(1);
-                            utils.produceRecord(props.getProperty("kafka.backoffice.topic"), record.value());
+                            utils.produceRecord(props.getProperty("kafka.backoffice.topic"), new ObjectMapper().writeValueAsString(queueAudit));
                         }
                     } catch (SQLException ex) {
                         logger.error("getScheduledAgentsAndAvailability - Exception - {}", ex.getMessage());
-                        utils.produceRecord(props.getProperty("kafka.backoffice.retry_topic"), record.value());
+                        utils.produceRecord(props.getProperty("kafka.backoffice.retry_topic"), new ObjectMapper().writeValueAsString(queueAudit));
                     } catch (Exception ex) {
                         ex.printStackTrace();
-                        utils.produceRecord(props.getProperty("kafka.backoffice.retry_topic"), record.value());
+                        utils.produceRecord(props.getProperty("kafka.backoffice.retry_topic"), new ObjectMapper().writeValueAsString(queueAudit));
                     }
                 }
             }

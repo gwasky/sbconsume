@@ -77,7 +77,7 @@ public class DBUtils {
     }
 
 
-    public ArrayList<AgentAvailability> getScheduledAgentsAndAvailability(String availabilityDate) throws SQLException {
+    public ArrayList<AgentAvailability> getScheduledAgentsAndAvailability(String availabilityDate,String deptName) throws SQLException {
         ArrayList<AgentAvailability> agents = new ArrayList<>();
         Connection conn = null;
         PreparedStatement preparedStatement = null;
@@ -86,6 +86,7 @@ public class DBUtils {
             conn = getDBConnection();
             preparedStatement = conn.prepareStatement(QUERY_GET_AVAILABLE_AGENTS);
             preparedStatement.setString(1, availabilityDate);
+            preparedStatement.setString(2, deptName);
             resultSet = preparedStatement.executeQuery();
             while (resultSet.next()) {
                 String scheduleFromDate = resultSet.getString("schedule_from_date");
@@ -95,7 +96,8 @@ public class DBUtils {
                 String availabitityDate = resultSet.getString("availability_date");
                 String dateEntered = resultSet.getString("date_entered");
                 String availabile = resultSet.getString("available");
-                AgentAvailability agentAvailability = new AgentAvailability(scheduleFromDate, scheduleToDate, agentName, agentID, availabitityDate, dateEntered, availabile);
+                String department = resultSet.getString("department");
+                AgentAvailability agentAvailability = new AgentAvailability(scheduleFromDate, scheduleToDate, agentName, agentID, availabitityDate, dateEntered, availabile,department);
                 // logger.info(String.valueOf(agentAvailability));
                 agents.add(agentAvailability);
             }
