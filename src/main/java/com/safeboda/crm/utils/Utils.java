@@ -222,7 +222,7 @@ public class Utils {
                 return userId;
             }
         } else {
-            logger.info("There are no available agents");
+            logger.info("NomimateUserForAssignment - No available agents");
         }
         return userId;
     }
