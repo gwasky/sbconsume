@@ -179,7 +179,7 @@ public class Utils {
     public String initializeObjectInRedis(String availabilityDate, ArrayList<AgentAvailability> agents) {
         ArrayList<AgentAssignmentTracker> agentTrackerList = new ArrayList<>();
         for (AgentAvailability agent : agents) {
-            AgentAssignmentTracker agentAssignmentTracker = new AgentAssignmentTracker(agent.getAgentID(), agent.getAvailabile(), 0,agent.getDeptName());
+            AgentAssignmentTracker agentAssignmentTracker = new AgentAssignmentTracker(agent.getAgentID(), agent.getAvailabile(), 0, agent.getDeptName());
             agentTrackerList.add(agentAssignmentTracker);
         }
         // Store
@@ -201,7 +201,7 @@ public class Utils {
         return availabilityObj;
     }
 
-    public String nominateUserForAssignment(String agents,String deptName) {
+    public String nominateUserForAssignment(String agents, String deptName) {
         String userId = null;
         Gson gson = new Gson();
         ArrayList<AgentAssignmentTracker> agentsList = new ArrayList<>();
@@ -269,11 +269,22 @@ public class Utils {
 //        logger.info("currentCachedList - {}",agentsList);
 //        logger.info("cachedAvailableAgents - {}",cachedAvailableAgents);
 
-        // Update Cache Object with Availability Status
+        // Update Cache Object with Availability Status and the Agent's New Department Name
         agentsList.stream().forEach(p -> {
-            if (availableAgents.contains(p.getAgentId())) p.setAgentAvailability("yes");
-            else p.setAgentAvailability("no");
+            if (availableAgents.contains(p.getAgentId())) {
+                scheduledAgentsAvailability.stream().forEach(x -> {
+                    if (x.getAgentID().equals(p.getAgentId())){
+                        p.setDeptName(x.getDeptName());
+                        p.setAgentAvailability("yes");
+                    }
+                });
+            }
+            else {
+                p.setAgentAvailability("no");
+            }
         });
+
+        logger.info("Refreshed Cached Object - {}", agentsList);
 
 //        logger.info("Updated Cached Agent List [ with Availability Status ] - {}",cachedAvailableAgents);
 
@@ -286,7 +297,7 @@ public class Utils {
 
         scheduledAgentsAvailability.stream().forEach(i -> {
             if (newAvailableAgents.contains(i.getAgentID())) {
-                agentsList.add(new AgentAssignmentTracker(i.getAgentID(), "yes", 0,i.getDeptName()));
+                agentsList.add(new AgentAssignmentTracker(i.getAgentID(), "yes", 0, i.getDeptName()));
             }
         });
 
@@ -413,7 +424,6 @@ public class Utils {
         return map;
     }
 
-
     public int updateCase(String rest_data) throws Exception {
         int resp;
         Properties props = loadProperties();
@@ -446,9 +456,10 @@ public class Utils {
             deptName = properties.getProperty("dept.perfomance");
         } else if (properties.getProperty("queue.id.food").equals(queueId)) {
             deptName = properties.getProperty("dept.food");
+        } else if (properties.getProperty("queue.id.proactive").equals(queueId)) {
+            deptName = properties.getProperty("dept.proactive");
         }
+        logger.info("Deparment Name - {} - {}",queueId,deptName);
         return deptName;
     }
-
-
 }
