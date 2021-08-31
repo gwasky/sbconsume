@@ -7,6 +7,7 @@ package com.safeboda.crm.utils;
 
 import com.mysql.cj.jdbc.MysqlDataSource;
 import com.safeboda.crm.entities.CaseAudit;
+import org.postgresql.util.PSQLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 //import java.util.logging.Level;
@@ -15,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 import static com.safeboda.crm.utils.Constants.*;
 
@@ -22,6 +24,8 @@ public class DBUtils {
 
     private String availabilityDate;
     Logger logger = LoggerFactory.getLogger(DBUtils.class.getName());
+    private int RETRIES = 0;
+    private final int MAX_RETRIES = 30;
     //private static final Logger logger = Logger.getLogger("BUNDLE-SERVICE");
     private String configFileName = "config.local.properties";
 
@@ -29,14 +33,13 @@ public class DBUtils {
     public DBUtils() {
     }
 
-
     public Connection getDBConnection() {
         Utils utils = new Utils();
         Connection conn = null;
         // logger.info("Env - {}", System.getenv("OP_ENV"));
         if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("production")) {
             configFileName = "config.properties";
-        } else if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("dev")){
+        } else if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("dev")) {
             configFileName = "config.dev.docker.properties";
         }
         try {
@@ -54,13 +57,13 @@ public class DBUtils {
         return conn;
     }
 
-    public Connection getPostgresDBConnection() {
+    public Connection getPostgresDBConnection() throws InterruptedException {
         Utils utils = new Utils();
         Connection conn = null;
         // logger.info("Env - {}", System.getenv("OP_ENV"));
         if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("production")) {
             configFileName = "config.properties";
-        } else if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("dev")){
+        } else if (System.getenv("OP_ENV") != null && System.getenv("OP_ENV").equals("dev")) {
             configFileName = "config.dev.docker.properties";
         }
         try {
@@ -70,14 +73,30 @@ public class DBUtils {
             props.setProperty("password", properties.getProperty("db.dwh.password"));
             Class.forName("org.postgresql.Driver");
             conn = DriverManager.getConnection(properties.getProperty("db.dwh.url"), props);
-        } catch (Exception ex) {
+            if (conn != null) {
+                logger.info("DB Connection Successul");
+            }
+        } catch (PSQLException ex) {
+            logger.error("PSQLException - {} | {} ",ex.getSQLState(),ex.getMessage());
+            if(ex.getSQLState().equals("08001")){
+                while (RETRIES < MAX_RETRIES) {
+                    TimeUnit.SECONDS.sleep(5);
+                    RETRIES += 1;
+                    logger.error("DWH DB Connection Failed - DB Connection Retry - {}/{}", RETRIES - 1, MAX_RETRIES);
+                    conn = getPostgresDBConnection();
+                    if (conn != null){
+                        break;
+                    }
+                }
+            }
+        } catch (Exception ex){
             ex.printStackTrace();
         }
         return conn;
     }
 
 
-    public ArrayList<AgentAvailability> getScheduledAgentsAndAvailability(String availabilityDate,String deptName) throws SQLException {
+    public ArrayList<AgentAvailability> getScheduledAgentsAndAvailability(String availabilityDate, String deptName) throws SQLException {
         ArrayList<AgentAvailability> agents = new ArrayList<>();
         Connection conn = null;
         PreparedStatement preparedStatement = null;
@@ -97,7 +116,7 @@ public class DBUtils {
                 String dateEntered = resultSet.getString("date_entered");
                 String availabile = resultSet.getString("available");
                 String department = resultSet.getString("department");
-                AgentAvailability agentAvailability = new AgentAvailability(scheduleFromDate, scheduleToDate, agentName, agentID, availabitityDate, dateEntered, availabile,department);
+                AgentAvailability agentAvailability = new AgentAvailability(scheduleFromDate, scheduleToDate, agentName, agentID, availabitityDate, dateEntered, availabile, department);
                 // logger.info(String.valueOf(agentAvailability));
                 agents.add(agentAvailability);
             }

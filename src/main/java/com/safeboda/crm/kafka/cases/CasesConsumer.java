@@ -41,11 +41,32 @@ public class CasesConsumer {
         Properties props = utils.loadProperties();
 
         String consumerTopic = props.getProperty("kafka.backoffice.topic");
-        // String consumerRetryTopic = props.getProperty("kafka.backoffice.retry_topic");
         Properties consumerProps = utils.getConsumerProperties();
         // Create Consumer
         KafkaConsumer<String, String> consumer = new KafkaConsumer<String, String>(consumerProps);
         consumer.subscribe(Arrays.asList(consumerTopic));
+
+//        try {
+//            logger.info("################### DEPLOYMENT ENV #################");
+//            logger.info("################### {} #################", System.getenv("OP_ENV"));
+//            logger.info("################### DEPLOYMENT ENV #################");
+//            while (true) {
+//                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(10000));
+//                String availabilityDate = new SimpleDateFormat("yyyy-MM-dd").format(Calendar.getInstance().getTime());
+//                String availabilityDateTime = new SimpleDateFormat("yyyy-MM-dd HH:mm").format(Calendar.getInstance().getTime());
+//                for (ConsumerRecord<String, String> record : records) {
+//
+//                    logger.info("Key: " + record.key() + ",  Value: " + record.value());
+//                    logger.info("Partition: " + record.partition() + ", Offest " + record.offset());
+//                }
+//            }
+//
+//        } catch (Exception ex) {
+//            ex.printStackTrace();
+//        } finally {
+//            // Closing will Clean up Sockets in use, alert the coordinator about the consumer's departure from a group
+//            consumer.close();
+//        }
 
         try {
 
@@ -55,20 +76,23 @@ public class CasesConsumer {
 
             //  poll for new data
             while (true) {
-                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
+                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
                 String availabilityDate = new SimpleDateFormat("yyyy-MM-dd").format(Calendar.getInstance().getTime());
                 String availabilityDateTime = new SimpleDateFormat("yyyy-MM-dd HH:mm").format(Calendar.getInstance().getTime());
                 for (ConsumerRecord<String, String> record : records) {
-
                     // logger.info("Key: " + record.key() + ",  Value: " + record.value());
-                    // logger.info("Partition: " + record.partition() + ", Offest " + record.offset());
+                    logger.info("Partition: " + record.partition() + ", Offest " + record.offset());
 
                     String agentAssignmentTracker = null;
                     // Deserialize object
                     ObjectMapper objectMapper = new ObjectMapper();
                     QueueAudit queueAudit = objectMapper.readValue(record.value(), QueueAudit.class);
                     try {
-                        System.out.println(queueAudit.getCaseId());
+                        String caseStatus = dbUtils.getCaseStatus(queueAudit.getCaseId());
+                        if (caseStatus.equals("Closed_Closed")) {
+                            logger.info("CaseId[{}] - Case Already Closed - Will not be Re-assigned", queueAudit.getCaseId());
+                            continue;
+                        }
                         String deptName = utils.getDeptName(props, queueAudit.getBoQueueId());
                         if (deptName != null) {
                             ArrayList<AgentAvailability> scheduledAgentsAvailability = dbUtils.getScheduledAgentsAndAvailability(availabilityDate, deptName);
@@ -76,13 +100,13 @@ public class CasesConsumer {
                             if (scheduledAgentsAvailability.size() > 0) {
                                 // logger.info(String.valueOf(scheduledAgentsAvailability));
                                 boolean exists = utils.checkForObjectRedisPersistence(availabilityDate);
-                                // logger.info(String.valueOf(exists));
                                 if (!exists) {
                                     try {
                                         agentAssignmentTracker = utils.initializeObjectInRedis(availabilityDate, scheduledAgentsAvailability);
                                     } catch (Exception ex) {
                                         logger.error("{} - Error Initializing Object in Redis - {}", queueAudit.getCaseId(), ex.getMessage());
                                         ex.printStackTrace();
+                                        TimeUnit.MINUTES.sleep(1);
                                         utils.produceRecord(props.getProperty("kafka.backoffice.topic"), new ObjectMapper().writeValueAsString(queueAudit));
                                     }
                                 } else {
@@ -91,10 +115,10 @@ public class CasesConsumer {
                                     } catch (Exception ex) {
                                         logger.error("{} - Error Fetching Availability Object from Redis - {}", queueAudit.getCaseId(), ex.getMessage());
                                         ex.printStackTrace();
+                                        TimeUnit.MINUTES.sleep(1);
                                         utils.produceRecord(props.getProperty("kafka.backoffice.topic"), new ObjectMapper().writeValueAsString(queueAudit));
                                     }
                                 }
-                                // logger.info(agentAssignmentTracker);
                                 // Update Redis Tracker with Newly Available Agents
                                 String agentAvailabilityList = utils.updateAvailabilityTrackerWithNewlyAvailableAgents(availabilityDate, scheduledAgentsAvailability, agentAssignmentTracker);
                                 logger.info("{} - agentAvailabilityList - {}", queueAudit.getCaseId(), agentAvailabilityList);
@@ -103,7 +127,7 @@ public class CasesConsumer {
                                     String userId = utils.nominateUserForAssignment(agentAvailabilityList, deptName);
                                     if (userId != null) {
                                         // Log the Ticket to Audit Audit Table
-                                        String caseStatus = dbUtils.getCaseStatus(queueAudit.getCaseId());
+
                                         CaseAudit caseAudit = new CaseAudit(queueAudit.getCaseId(), userId, caseStatus, SOURCE);
                                         int result = dbUtils.logToAuditTable(caseAudit);
                                         logger.info("Log to Audit Table {}|{}|{}|{}", queueAudit.getCaseId(), userId, caseStatus, result);
@@ -123,6 +147,7 @@ public class CasesConsumer {
                                         } else {
                                             logger.info("CaseID[{}] Assignment to Agent[{}] Failed", queueAudit.getCaseId(), userId);
                                             // Send to Retry Topic
+                                            TimeUnit.MINUTES.sleep(1);
                                             utils.produceRecord(props.getProperty("kafka.backoffice.topic"), new ObjectMapper().writeValueAsString(queueAudit));
                                         }
                                     } else {
@@ -133,6 +158,7 @@ public class CasesConsumer {
                                     }
                                 } else {
                                     logger.error("{} - No Object found for Agent Assignment Tracker", queueAudit.getCaseId());
+                                    TimeUnit.MINUTES.sleep(1);
                                     utils.produceRecord(props.getProperty("kafka.backoffice.topic"), new ObjectMapper().writeValueAsString(queueAudit));
                                 }
                             } else {
@@ -145,11 +171,16 @@ public class CasesConsumer {
                         }
                     } catch (SQLException ex) {
                         logger.error("getScheduledAgentsAndAvailability - Exception - {}", ex.getMessage());
+                        TimeUnit.MINUTES.sleep(1);
                         utils.produceRecord(props.getProperty("kafka.backoffice.topic"), new ObjectMapper().writeValueAsString(queueAudit));
                     } catch (Exception ex) {
                         ex.printStackTrace();
+                        TimeUnit.MINUTES.sleep(1);
                         utils.produceRecord(props.getProperty("kafka.backoffice.topic"), new ObjectMapper().writeValueAsString(queueAudit));
                     }
+
+                    // Keep Track of Current Offset
+
                 }
             }
         } catch (Exception e) {

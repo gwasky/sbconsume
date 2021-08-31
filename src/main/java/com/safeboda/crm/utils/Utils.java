@@ -79,7 +79,7 @@ public class Utils {
                         // if exception is null,
                         logger.info("Received new Metadata, Offset {}", recordMetadata.offset());
                     } else {
-                        logger.error("Error Producing - {}", message);
+                        logger.error("Error Producing - {} - {}", message,e.getMessage());
                         e.printStackTrace();
                     }
                 }
@@ -115,7 +115,7 @@ public class Utils {
         properties.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         properties.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        // properties.put("enable.auto.commit", "false");
+        properties.put("enable.auto.commit", "true");
         return properties;
     }
 

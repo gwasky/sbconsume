@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -167,12 +168,17 @@ public class Main {
 //
 //        String queueName = utils.getDeptName(properties,queueAudit.getBoQueueId());
 //        System.out.println(queueName);
-        String deptName = "Main1";
-        ArrayList<AgentAssignmentTracker> agentsList = new ArrayList<>();
-        agentsList.add(new AgentAssignmentTracker("d0bc1e5f-a385-a53b-9feb-5d4bc7f610e6","yes",0,"Main1"));
-        List<AgentAssignmentTracker> availableAgents = agentsList.stream()
-                .filter(p -> p.getAgentAvailability().endsWith("yes")).filter(x -> x.getDeptName().equals(deptName)).collect(Collectors.toList());
-        System.out.println(availableAgents);
+//        String deptName = "Main1";
+////        ArrayList<AgentAssignmentTracker> agentsList = new ArrayList<>();
+////        agentsList.add(new AgentAssignmentTracker("d0bc1e5f-a385-a53b-9feb-5d4bc7f610e6","yes",0,"Main1"));
+////        List<AgentAssignmentTracker> availableAgents = agentsList.stream()
+////                .filter(p -> p.getAgentAvailability().endsWith("yes")).filter(x -> x.getDeptName().equals(deptName)).collect(Collectors.toList());
+////        System.out.println(availableAgents);
+
+        Connection conn = dbUtils.getPostgresDBConnection();
+         if (conn != null){
+             System.out.println("here we are");
+         }
     }
 
 
